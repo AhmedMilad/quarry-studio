@@ -92,9 +92,13 @@ Export query results or whole tables (with your filters applied) as **CSV, JSON,
 
 ## Screenshots
 
-| Query editor | Update confirmation |
+| Query editor | Table data with filters |
 | --- | --- |
-| ![Query editor](docs/screenshots/query-editor.png) | ![Update confirmation](docs/screenshots/update-confirmation.png) |
+| ![Query editor](docs/screenshots/query-editor.png) | ![Table data](docs/screenshots/table-data.png) |
+
+| Delete confirmation (with cascade) | Update confirmation (before → after) |
+| --- | --- |
+| ![Delete confirmation](docs/screenshots/delete-confirmation.png) | ![Update confirmation](docs/screenshots/update-confirmation.png) |
 
 ## Supported databases
 
