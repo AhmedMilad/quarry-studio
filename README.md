@@ -21,9 +21,9 @@
 > **This project is vibe coded.** It was built almost entirely by prompting an AI coding assistant
 > (Claude Code), one feature request at a time. A human described the behaviour they wanted and
 > tested the result; the AI wrote the code. Every feature was checked in the running app, but the
-> code has not had a line-by-line human review. The SQLite driver gets the most testing. The MySQL,
-> PostgreSQL and SQL Server drivers have **not been tested against live servers yet**. Use it on
-> production databases with care, and bug reports are welcome.
+> code has not had a line-by-line human review. It has been used against real MySQL, PostgreSQL,
+> SQL Server and SQLite databases, but there is no automated test suite yet. Use it on production
+> databases with care, and bug reports are welcome.
 
 ![Table data with filters](docs/screenshots/table-data.png)
 
@@ -215,7 +215,7 @@ src/
 
 ## Known limitations
 
-- **Testing:** only SQLite has been tested end to end. The MySQL, PostgreSQL and SQL Server code paths, including foreign-key lookups and the count queries in the confirmation dialog, still need testing against real servers.
+- **Testing:** checked by hand against real MySQL, PostgreSQL, SQL Server and SQLite databases. There is no automated test suite yet, and CockroachDB and Amazon Redshift (which use the PostgreSQL driver) haven't been tried.
 - **Statement parsing:** the parser for the confirmation dialog handles common `UPDATE`/`DELETE` forms (CTEs, `USING`, `FROM`, `TOP`, `LIMIT`, `RETURNING`/`OUTPUT`). Unusual dialect-specific syntax may get an approximate count or none.
 - **Platforms:** packaging is set up for Linux only.
 
