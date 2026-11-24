@@ -1778,3 +1778,24 @@ pre.ddl {
   border-color: var(--dc-blue);
   color: var(--dc-blue-text);
 }
+
+/* Foreign-key values: a link that opens the referenced row */
+.fk-link {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, var(--accent) 45%, transparent);
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.fk-link:hover {
+  text-decoration-color: var(--accent);
+}
+.fk-link .cell-num {
+  color: inherit;
+}
+.col-head .fk-icon {
+  display: inline-flex;
+  color: var(--accent);
+  flex-shrink: 0;
+  opacity: 0.8;
+}

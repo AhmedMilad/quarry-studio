@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import DataGrid, { SelectColumn, type Column, type SortColumn } from 'react-data-grid'
 import 'react-data-grid/lib/styles.css'
-import { ArrowDown, ArrowUp, Braces, ClipboardPaste, Clipboard, Copy, Eraser, Eye, KeyRound, PenLine } from 'lucide-react'
-import type { CellValue, ResultColumn } from '@shared/types'
-import { formatTsv } from '@shared/export'
+import { ArrowDown, ArrowUp, Braces, FileCode2, Link2, ClipboardPaste, Clipboard, Copy, Eraser, Eye, KeyRound, PenLine } from 'lucide-react'
+import type { CellValue, Dialect, ResultColumn } from '@shared/types'
+import { formatTsv, insertStatements } from '@shared/export'
 import { useApp, type MenuItem } from '../store'
 import { isTypingTarget } from '../commands'
 import { Modal } from './Overlays'
@@ -17,6 +17,8 @@ export interface GridRow {
 
 export interface GridColumn extends ResultColumn {
   pk?: boolean
+  /** foreign key: the value is rendered as a link that opens the referenced row */
+  fk?: { target: string; open: (row: GridRow) => void }
 }
 
 export const colKey = (i: number): string => `c${i}`
@@ -45,7 +47,7 @@ function renderValue(v: unknown): JSX.Element | string {
 }
 
 function estimateWidth(c: GridColumn, rows: GridRow[], key: string): number {
-  let max = c.name.length + (c.type ? c.type.length * 0.7 : 0) + (c.pk ? 3 : 0)
+  let max = c.name.length + (c.type ? c.type.length * 0.7 : 0) + (c.pk ? 3 : 0) + (c.fk ? 3 : 0)
   for (let i = 0; i < Math.min(rows.length, 50); i++) {
     const v = rows[i][key]
     const len = v === null || v === undefined ? 4 : String(v).length
@@ -66,6 +68,8 @@ interface Props {
   onSelectedRowsChange?: (s: Set<number>) => void
   isEdited?: (row: GridRow, key: string) => boolean
   extraMenu?: (row: GridRow, key: string) => MenuItem[]
+  /** enables "Copy as INSERT": the (quoted, qualified) table name to insert into, and the SQL dialect */
+  insertTarget?: { table: string; dialect: Dialect }
 }
 
 export function DataTable(props: Props): JSX.Element {
@@ -267,13 +271,36 @@ export function DataTable(props: Props): JSX.Element {
         renderHeaderCell: ({ sortDirection }) => (
           <div className="col-head" title={`${c.name}${c.type ? ` (${c.type})` : ''}`}>
             {c.pk && <KeyRound size={11} className="pk" />}
+            {c.fk && (
+              <span className="fk-icon" title={`Foreign key → ${c.fk.target}`}>
+                <Link2 size={11} />
+              </span>
+            )}
             <span className="n">{c.name}</span>
             {c.type && <span className="ty">{c.type}</span>}
             {sortDirection === 'ASC' && <ArrowUp size={12} />}
             {sortDirection === 'DESC' && <ArrowDown size={12} />}
           </div>
         ),
-        renderCell: ({ row }) => renderValue(row[key])
+        renderCell: ({ row }) => {
+          const v = row[key]
+          if (!c.fk || v === null || v === undefined || row.__state === 'deleted') return renderValue(v)
+          const fk = c.fk
+          return (
+            <span
+              className="fk-link"
+              title={`Open the referenced row in ${fk.target}`}
+              onMouseDown={(e) => e.stopPropagation()} // don't start a range drag
+              onClick={(e) => {
+                e.stopPropagation()
+                fk.open(row)
+              }}
+              onDoubleClick={(e) => e.stopPropagation()}
+            >
+              {renderValue(v)}
+            </span>
+          )
+        }
       })
     })
     return cols
@@ -379,6 +406,27 @@ export function DataTable(props: Props): JSX.Element {
               onClick: () =>
                 copy(JSON.stringify(Object.fromEntries(columns.map((c, i) => [c.name, values[i]])), null, 2), 'Row copied')
             },
+            ...(props.insertTarget
+              ? (() => {
+                  const { table, dialect } = props.insertTarget
+                  // which rows: the ticked rows (if the clicked one is among them), else the rows a cell range spans, else this row
+                  const ticked = props.selectedRows?.has(row.__id) ? rows.filter((r) => props.selectedRows!.has(r.__id)) : []
+                  const target =
+                    ticked.length > 1 ? ticked : inRange && b && b.r2 > b.r1 ? rows.slice(b.r1, b.r2 + 1) : [row]
+                  const n = target.length
+                  return [
+                    {
+                      label: n > 1 ? `Copy ${n} rows as INSERT` : 'Copy row as INSERT',
+                      icon: <FileCode2 size={14} />,
+                      onClick: () =>
+                        copy(
+                          insertStatements(table, columns.map((c) => c.name), target.map((r) => rowValues(r, columns.length)), dialect),
+                          n > 1 ? `${n} INSERT statements copied` : 'INSERT statement copied'
+                        )
+                    }
+                  ]
+                })()
+              : []),
             {
               label: 'Copy all rows (TSV with header)',
               icon: <Copy size={14} />,

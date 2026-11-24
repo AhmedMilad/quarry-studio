@@ -6,14 +6,14 @@ function csvCell(v: CellValue): string {
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
 }
 
-function sqlLiteral(v: CellValue): string {
+function sqlLiteral(v: CellValue, dialect?: Dialect): string {
   if (v === null) return 'NULL'
   if (typeof v === 'number') return String(v)
-  if (typeof v === 'boolean') return v ? 'TRUE' : 'FALSE'
+  if (typeof v === 'boolean') return dialect === 'mssql' ? (v ? '1' : '0') : v ? 'TRUE' : 'FALSE'
   return `'${String(v).replace(/'/g, "''")}'`
 }
 
-function quoteId(id: string, dialect: Dialect): string {
+export function quoteId(id: string, dialect: Dialect): string {
   if (dialect === 'mysql') return '`' + id.replace(/`/g, '``') + '`'
   if (dialect === 'mssql') return '[' + id.replace(/]/g, ']]') + ']'
   return '"' + id.replace(/"/g, '""') + '"'
@@ -43,10 +43,7 @@ export function formatRows(
       ].join('\n') + '\n'
     }
     case 'sql': {
-      const d = opts.dialect ?? 'postgres'
-      const t = opts.tableName ? opts.tableName : 'my_table'
-      const cols = columns.map((c) => quoteId(c, d)).join(', ')
-      return rows.map((r) => `INSERT INTO ${t} (${cols}) VALUES (${r.map(sqlLiteral).join(', ')});`).join('\n') + '\n'
+      return insertStatements(opts.tableName ?? 'my_table', columns, rows, opts.dialect ?? 'postgres') + '\n'
     }
   }
 }
@@ -56,4 +53,26 @@ export function formatTsv(columns: string[] | null, rows: CellValue[][]): string
   const lines = rows.map((r) => r.map(cell).join('\t'))
   if (columns) lines.unshift(columns.join('\t'))
   return lines.join('\n')
+}
+
+/** One `INSERT INTO table (cols) VALUES (...);` per row. `table` is used as given (already quoted/qualified). */
+export function insertStatements(table: string, columns: string[], rows: CellValue[][], dialect: Dialect): string {
+  const cols = columns.map((c) => quoteId(c, dialect)).join(', ')
+  return rows.map((r) => `INSERT INTO ${table} (${cols}) VALUES (${r.map((v) => sqlLiteral(v, dialect)).join(', ')});`).join('\n')
+}
+
+/**
+ * The table a query result came from, when the statement is a plain single-table SELECT
+ * (no JOIN, sub-select or set operation). Returned as written in the SQL, e.g. `public.users`.
+ */
+export function selectSourceTable(sql: string): string | null {
+  const body = sql.replace(/--[^\n]*|\/\*[\s\S]*?\*\//g, ' ').trim().replace(/;\s*$/, '')
+  if (!/^select\b/i.test(body)) return null
+  if (/\b(join|union|intersect|except|group\s+by)\b/i.test(body) || /\(\s*select\b/i.test(body)) return null
+  const ident = String.raw`(?:"[^"]+"|\`[^\`]+\`|\[[^\]]+\]|[\w$]+)`
+  const m = new RegExp(String.raw`\bfrom\s+(${ident}(?:\s*\.\s*${ident}){0,2})(\s|,|$)`, 'i').exec(body)
+  if (!m || m[2] === ',') return null
+  // "FROM a, b" is a join too
+  if (new RegExp(String.raw`\bfrom\s+${ident}(?:\s*\.\s*${ident}){0,2}(?:\s+(?:as\s+)?\w+)?\s*,`, 'i').test(body)) return null
+  return m[1].replace(/\s+/g, '')
 }

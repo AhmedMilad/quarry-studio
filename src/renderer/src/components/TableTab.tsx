@@ -37,7 +37,7 @@ import { api } from '../api'
 import { useApp, type TableTabState } from '../store'
 import { registerTabCommands } from '../commands'
 import { DataTable, colKey, rowValues, toGridRows, type GridColumn, type GridRow } from './DataTable'
-import { formatTsv } from '@shared/export'
+import { formatTsv, quoteId } from '@shared/export'
 
 const OPS = ['=', '!=', '<', '>', '<=', '>=', 'LIKE', 'NOT LIKE', 'IN', 'NOT IN', 'IS NULL', 'IS NOT NULL']
 
@@ -83,6 +83,11 @@ function TableData({ sid, tab }: { sid: string; tab: TableTabState }): JSX.Eleme
   const pageSize = useApp((s) => s.settings.pageSize)
   const readOnly = useApp((s) => s.sessions[sid]?.info.config.readOnly)
   const dialect = useApp((s) => s.sessions[sid]?.info.dialect)
+  // table name for "Copy as INSERT": schema-qualified where schemas matter (Postgres, SQL Server)
+  const qualifiedName = dialect
+    ? (tab.table.schema && (dialect === 'postgres' || dialect === 'mssql') ? quoteId(tab.table.schema, dialect) + '.' : '') +
+      quoteId(tab.table.name, dialect)
+    : tab.table.name
   const toast = useApp((s) => s.toast)
   const showMenu = useApp((s) => s.showMenu)
 
@@ -90,12 +95,12 @@ function TableData({ sid, tab }: { sid: string; tab: TableTabState }): JSX.Eleme
   const [data, setData] = useState<DataState>({ columns: [], rows: [], total: null, loading: true })
   const [page, setPage] = useState(0)
   const [sort, setSort] = useState<SortColumn[]>([])
-  const [filters, setFilters] = useState<FilterCondition[]>([])
+  const [filters, setFilters] = useState<FilterCondition[]>(() => tab.initialFilters ?? [])
   const [rawWhere, setRawWhere] = useState('')
   const [filterMode, setFilterMode] = useState<'builder' | 'raw'>('builder')
   const [join, setJoin] = useState<'AND' | 'OR'>('AND')
   const [applied, setApplied] = useState<{ filters: FilterCondition[]; where: string; join: 'AND' | 'OR' }>({
-    filters: [],
+    filters: tab.initialFilters ?? [],
     where: '',
     join: 'AND'
   })
@@ -114,7 +119,40 @@ function TableData({ sid, tab }: { sid: string; tab: TableTabState }): JSX.Eleme
       .listColumns(sid, tab.table)
       .then(setMeta)
       .catch(() => setMeta([]))
+    api
+      .listForeignKeys(sid, tab.table)
+      .then(setFks)
+      .catch(() => setFks([]))
   }, [sid, tab.table])
+
+  // ---- foreign keys: clicking a value opens the referenced row in a new tab ----
+  const [fks, setFks] = useState<ForeignKeyInfo[]>([])
+  const sessionTables = useApp((s) => s.sessions[sid]?.tables)
+  const openTableTab = useApp((s) => s.openTableTab)
+  const followFk = useCallback(
+    async (group: ForeignKeyInfo[], row: GridRow) => {
+      const ref = group[0]
+      const refTable = { name: ref.refTable, schema: ref.refSchema ?? tab.table.schema }
+      let refCols = group.map((f) => f.refColumn)
+      // SQLite allows "REFERENCES t" without a column: that means t's primary key
+      if (refCols.some((c) => !c)) {
+        const pk = (await api.listColumns(sid, refTable).catch(() => [])).filter((c) => c.primaryKey).map((c) => c.name)
+        refCols = refCols.map((c, i) => c || pk[i] || '')
+      }
+      const filters: FilterCondition[] = []
+      for (let i = 0; i < group.length; i++) {
+        const idx = data.columns.findIndex((c) => c.name === group[i].column)
+        const v = idx >= 0 ? row[colKey(idx)] : null
+        if (v === null || v === undefined || !refCols[i]) return
+        filters.push({ column: refCols[i], op: '=', value: String(v) })
+      }
+      const info =
+        sessionTables?.find((t) => t.name === refTable.name && (!refTable.schema || !t.schema || t.schema === refTable.schema)) ??
+        { ...refTable, type: 'table' as const }
+      openTableTab(sid, info, 'data', true, filters)
+    },
+    [sid, tab.table.schema, data.columns, sessionTables, openTableTab]
+  )
 
   const load = useCallback(async () => {
     setData((d) => ({ ...d, loading: true, error: undefined }))
@@ -148,8 +186,22 @@ function TableData({ sid, tab }: { sid: string; tab: TableTabState }): JSX.Eleme
 
   const columns = useMemo<GridColumn[]>(() => {
     const byName = new Map(meta.map((m) => [m.name, m]))
-    return data.columns.map((c) => ({ ...c, type: byName.get(c.name)?.dataType ?? c.type, pk: byName.get(c.name)?.primaryKey }))
-  }, [data.columns, meta])
+    // group FK columns by constraint so composite keys follow all their columns at once
+    const groups = new Map<string, ForeignKeyInfo[]>()
+    for (const f of fks) groups.set(f.name, [...(groups.get(f.name) ?? []), f])
+    const fkByColumn = new Map<string, ForeignKeyInfo[]>()
+    for (const g of groups.values()) for (const f of g) if (!fkByColumn.has(f.column)) fkByColumn.set(f.column, g)
+    return data.columns.map((c) => {
+      const g = fkByColumn.get(c.name)
+      const ref = g?.find((f) => f.column === c.name)
+      return {
+        ...c,
+        type: byName.get(c.name)?.dataType ?? c.type,
+        pk: byName.get(c.name)?.primaryKey,
+        fk: g && ref ? { target: `${ref.refTable}${ref.refColumn ? '.' + ref.refColumn : ''}`, open: (row: GridRow) => void followFk(g, row) } : undefined
+      }
+    })
+  }, [data.columns, meta, fks, followFk])
 
   // ---- pending change tracking ----
   const isEdited = useCallback((row: GridRow, key: string): boolean => {
@@ -695,6 +747,7 @@ function TableData({ sid, tab }: { sid: string; tab: TableTabState }): JSX.Eleme
               selectedRows={selected}
               onSelectedRowsChange={setSelected}
               isEdited={isEdited}
+              insertTarget={dialect ? { table: qualifiedName, dialect } : undefined}
               extraMenu={
                 editable
                   ? (row, key) => [

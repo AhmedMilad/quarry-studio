@@ -5,6 +5,7 @@ import type {
   ConnectionConfig,
   RoutineInfo,
   SessionInfo,
+  FilterCondition,
   TableInfo,
   TableRef
 } from '@shared/types'
@@ -27,6 +28,8 @@ export interface TableTabState {
   table: TableRef
   tableType: 'table' | 'view'
   view: 'data' | 'structure'
+  /** filters already applied when the tab opens (e.g. following a foreign key) */
+  initialFilters?: FilterCondition[]
 }
 
 export type Tab = QueryTabState | TableTabState
@@ -102,7 +105,8 @@ interface AppState {
   setSchema(sid: string, schema: string): Promise<void>
   openQueryTab(sid: string, sql?: string, title?: string, savedId?: string): void
   /** focuses an existing tab of this table unless `newTab` is set (always opens another one) */
-  openTableTab(sid: string, t: TableInfo, view?: 'data' | 'structure', newTab?: boolean): void
+  /** `filters` opens a new tab with those filters applied (used to follow a foreign key) */
+  openTableTab(sid: string, t: TableInfo, view?: 'data' | 'structure', newTab?: boolean, filters?: FilterCondition[]): void
   closeTab(sid: string, tabId: string): void
   closeOtherTabs(sid: string, tabId: string): void
   /** reopen the most recently closed tab; returns false if there is none */
@@ -273,7 +277,8 @@ export const useApp = create<AppState>((set, get) => {
       patchSession(sid, { tabs: [...s.tabs, tab], activeTabId: tab.id, queryCounter: n })
     },
 
-    openTableTab(sid, t, view = 'data', newTab = false) {
+    openTableTab(sid, t, view = 'data', newTab = false, filters) {
+      if (filters?.length) newTab = true
       const s = get().sessions[sid]
       if (!s) return
       const sameTable = s.tabs.filter(
@@ -298,7 +303,8 @@ export const useApp = create<AppState>((set, get) => {
         title,
         table: { name: t.name, schema: t.schema },
         tableType: t.type,
-        view
+        view,
+        ...(filters?.length ? { initialFilters: filters } : {})
       }
       patchSession(sid, { tabs: [...s.tabs, tab], activeTabId: tab.id })
     },

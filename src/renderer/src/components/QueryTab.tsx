@@ -15,10 +15,10 @@ import {
   FileSpreadsheet
 } from 'lucide-react'
 import type { DestructiveCheck, Dialect, ExportFormat, QueryResult, TextExportFormat } from '@shared/types'
-import { statementAt } from '@shared/sql'
+import { splitStatements, statementAt } from '@shared/sql'
 import { analyzeDestructive } from '@shared/destructive'
 import { DestructiveConfirm } from './DestructiveConfirm'
-import { formatRows } from '@shared/export'
+import { formatRows, selectSourceTable } from '@shared/export'
 import { api } from '../api'
 import { monaco } from '../monaco'
 import { useApp, type QueryTabState } from '../store'
@@ -267,6 +267,13 @@ export function QueryTab({ sid, tab, active }: { sid: string; tab: QueryTabState
   const current = state.results[state.active]
   const gridColumns = useMemo<GridColumn[]>(() => current?.columns ?? [], [current])
   const gridRows = useMemo(() => (current ? toGridRows(current.rows) : []), [current])
+  // "Copy as INSERT" targets the source table of a plain single-table SELECT, otherwise a placeholder name
+  const insertTarget = useMemo(() => {
+    if (!dialect) return undefined
+    const stmts = state.executedSql ? splitStatements(state.executedSql) : []
+    const sql = stmts.length === state.results.length ? stmts[state.active]?.text : stmts.length === 1 ? stmts[0].text : undefined
+    return { table: (sql && selectSourceTable(sql)) || 'table_name', dialect }
+  }, [dialect, state.executedSql, state.results.length, state.active])
 
   const exportMenu = (e: React.MouseEvent): void => {
     if (!current) return
@@ -388,7 +395,7 @@ export function QueryTab({ sid, tab, active }: { sid: string; tab: QueryTabState
           ) : current ? (
             current.columns.length ? (
               <div className="grid-wrap">
-                <DataTable columns={gridColumns} rows={gridRows} />
+                <DataTable columns={gridColumns} rows={gridRows} insertTarget={insertTarget} />
               </div>
             ) : (
               <div className="results-msg">
