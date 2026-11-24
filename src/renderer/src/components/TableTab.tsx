@@ -539,6 +539,12 @@ function TableData({ sid, tab }: { sid: string; tab: TableTabState }): JSX.Eleme
           else toast('No pending changes to save', 'info')
         },
         refresh: () => cmdRef.current.refresh(),
+        // Ctrl+Enter on a selected foreign-key cell follows the link, like clicking it
+        run: () => {
+          const link = document.activeElement?.closest('[role=gridcell]')?.querySelector<HTMLElement>('.fk-link')
+          if (!link) return false
+          link.click()
+        },
         find: () => cmdRef.current.focusFilter(),
         selectAll: () => cmdRef.current.selectAllRows(),
         copySelection: () => cmdRef.current.copySelected(),

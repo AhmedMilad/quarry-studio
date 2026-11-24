@@ -77,7 +77,7 @@ Delete confirmations are red and update confirmations are light blue. **Cancel**
 - **Filters:** use the builder, which matches **ALL (AND)** or **ANY (OR)** of its lines, or type a raw `WHERE` clause. Lines with an empty value are ignored. For `IS NULL` / `IS NOT NULL` the value field is disabled.
 - **Inline editing** of cells, plus adding, cloning and deleting rows and setting values to NULL. Changes are highlighted and stay pending until you **apply them in one transaction** (`Ctrl+S`), or discard them (`Esc`).
 - **Range selection:** drag, `Shift+click` or `Shift+arrows` to select cells. Copy them as TSV, paste a block (a single value fills the whole range), or set them all to NULL. A badge shows the count, sum, average, minimum and maximum.
-- **Foreign keys are links:** values in a foreign-key column (marked with a link icon in the header) are clickable. Clicking one opens the referenced table in a new tab, filtered to that row. Composite keys match on all their columns. To edit a foreign-key cell, double-click beside the value or press `Enter`.
+- **Foreign keys are links:** values in a foreign-key column (marked with a link icon in the header) are clickable. Clicking one opens the referenced table in a new tab, filtered to that row. Composite keys match on all their columns. Select a foreign-key cell and press `Ctrl+Enter` to do the same from the keyboard. To edit a foreign-key cell, double-click beside the value or press `Enter`.
 - **Copy as INSERT:** right-click a row to copy it as an `INSERT` statement. With rows ticked or a multi-row cell range selected, it copies all of them ("Copy 3 rows as INSERT"). Query results get it too: a plain single-table `SELECT` uses that table's name, and anything else uses a `table_name` placeholder.
 - You can open the same table in several tabs. `Ctrl+Shift+T` reopens a closed tab.
 - The **Structure** view shows columns, indexes, foreign keys and the DDL.
@@ -154,6 +154,7 @@ The Electron code is cross-platform, so macOS and Windows builds should work wit
 | `Ctrl+Shift+T` | Reopen the last closed tab (query tabs come back with their SQL) |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Next / previous tab |
 | `Ctrl+Click` / middle-click a table | Open it in a new tab |
+| `Ctrl+Enter` on a foreign-key cell | Open the referenced row in a new tab (same as clicking the link) |
 | `Ctrl+U` / `Ctrl+Shift+U` | Next / previous connection |
 | `Alt+1` … `Alt+9` / `Alt+0` | Jump to connection N / connection manager |
 | `Ctrl+Q` | Quit |
