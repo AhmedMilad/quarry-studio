@@ -53,7 +53,8 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - name: Tests
-        run: pnpm test
+        # github-actions reporter: failures show up as annotations on the run page
+        run: pnpm test --reporter=default --reporter=github-actions
         env:
           QS_TEST_MYSQL: mysql://root:quarry@127.0.0.1:3306/qs_test
           QS_TEST_POSTGRES: postgres://postgres:quarry@127.0.0.1:5432/qs_test
