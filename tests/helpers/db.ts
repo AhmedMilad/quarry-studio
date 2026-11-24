@@ -93,7 +93,7 @@ export async function rows(d: BaseDriver, sql: string): Promise<CellValue[][]> {
 
 /**
  * Fixture: 10 customers, 20 orders (2 per customer, ON DELETE CASCADE).
- *   customer i: plan = ['free','pro','team'][i % 3]  →  pro: 1,4,7,10 · team: 2,5,8 · free: 3,6,9
+ *   customer i: tier = ['free','pro','team'][i % 3]  →  pro: 1,4,7,10 · team: 2,5,8 · free: 3,6,9
  *               credit = i * 10, email NULL for 4 and 8, name of 2 is O'Brien
  *   order i:    customer = ((i - 1) % 10) + 1, status = odd ? 'paid' : 'pending', qty = i % 3 + 1
  */
@@ -107,21 +107,21 @@ export async function resetFixture(d: BaseDriver): Promise<void> {
   const engine = d.dialect === 'mysql' ? ' ENGINE=InnoDB' : ''
   await run(
     d,
-    `CREATE TABLE qs_customers (id INT NOT NULL PRIMARY KEY, name ${text} NOT NULL, plan ${text}, credit INT NOT NULL, email ${text} UNIQUE)${engine}`
+    `CREATE TABLE qs_customers (id INT NOT NULL PRIMARY KEY, name ${text} NOT NULL, tier ${text}, credit INT NOT NULL, email ${text} UNIQUE)${engine}`
   )
   await run(
     d,
     `CREATE TABLE qs_orders (id INT NOT NULL PRIMARY KEY, customer_id INT, status ${text}, qty INT,
        CONSTRAINT fk_qs_orders_customer FOREIGN KEY (customer_id) REFERENCES qs_customers (id) ON DELETE CASCADE)${engine}`
   )
-  const plans = ['free', 'pro', 'team']
+  const tiers = ['free', 'pro', 'team']
   const customers: string[] = []
   for (let i = 1; i <= 10; i++) {
     const name = i === 2 ? "O''Brien" : `Customer ${i}`
     const email = i % 4 === 0 ? 'NULL' : `'c${i}@example.com'`
-    customers.push(`(${i}, '${name}', '${plans[i % 3]}', ${i * 10}, ${email})`)
+    customers.push(`(${i}, '${name}', '${tiers[i % 3]}', ${i * 10}, ${email})`)
   }
-  await run(d, `INSERT INTO qs_customers (id, name, plan, credit, email) VALUES ${customers.join(', ')}`)
+  await run(d, `INSERT INTO qs_customers (id, name, tier, credit, email) VALUES ${customers.join(', ')}`)
   const orders: string[] = []
   for (let i = 1; i <= 20; i++) orders.push(`(${i}, ${((i - 1) % 10) + 1}, '${i % 2 ? 'paid' : 'pending'}', ${(i % 3) + 1})`)
   await run(d, `INSERT INTO qs_orders (id, customer_id, status, qty) VALUES ${orders.join(', ')}`)

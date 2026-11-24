@@ -29,7 +29,7 @@ describe.each(targets())('driver contract: $name', (target) => {
 
   it('describes columns and the primary key', async () => {
     const cols = await d.listColumns(customers)
-    expect(cols.map((c) => c.name.toLowerCase())).toEqual(['id', 'name', 'plan', 'credit', 'email'])
+    expect(cols.map((c) => c.name.toLowerCase())).toEqual(['id', 'name', 'tier', 'credit', 'email'])
     expect(cols.filter((c) => c.primaryKey).map((c) => c.name.toLowerCase())).toEqual(['id'])
   })
 
@@ -61,7 +61,7 @@ describe.each(targets())('driver contract: $name', (target) => {
         limit: 100,
         offset: 0,
         filters: [
-          { column: 'plan', op: '=', value: 'pro' },
+          { column: 'tier', op: '=', value: 'pro' },
           { column: 'credit', op: '>', value: '40' }
         ]
       })
@@ -71,7 +71,7 @@ describe.each(targets())('driver contract: $name', (target) => {
         offset: 0,
         filterJoin: 'OR',
         filters: [
-          { column: 'plan', op: '=', value: 'free' },
+          { column: 'tier', op: '=', value: 'free' },
           { column: 'id', op: '=', value: '1' }
         ]
       })
@@ -83,7 +83,7 @@ describe.each(targets())('driver contract: $name', (target) => {
         limit: 100,
         offset: 0,
         filters: [
-          { column: 'plan', op: '=', value: 'team' },
+          { column: 'tier', op: '=', value: 'team' },
           { column: 'name', op: '=', value: '' }
         ]
       })
@@ -106,7 +106,7 @@ describe.each(targets())('driver contract: $name', (target) => {
     await d.applyChanges({
       table: customers,
       primaryKeys: ['id'],
-      inserts: [{ id: 11, name: 'New', plan: 'free', credit: 0, email: null }],
+      inserts: [{ id: 11, name: 'New', tier: 'free', credit: 0, email: null }],
       updates: [{ pk: { id: 1 }, values: { name: 'Renamed' } }],
       deletes: [{ id: 3 }]
     })
@@ -120,7 +120,7 @@ describe.each(targets())('driver contract: $name', (target) => {
       d.applyChanges({
         table: customers,
         primaryKeys: ['id'],
-        inserts: [{ id: 1, name: 'duplicate key', plan: 'x', credit: 0, email: null }],
+        inserts: [{ id: 1, name: 'duplicate key', tier: 'x', credit: 0, email: null }],
         updates: [{ pk: { id: 2 }, values: { name: 'should not stick' } }],
         deletes: []
       })
@@ -129,12 +129,12 @@ describe.each(targets())('driver contract: $name', (target) => {
   })
 
   it('"Copy as INSERT" output re-creates the rows exactly', async () => {
-    const before = await rows(d, 'SELECT id, name, plan, credit, email FROM qs_customers ORDER BY id')
-    const sql = insertStatements('qs_customers', ['id', 'name', 'plan', 'credit', 'email'], before, target.dialect)
+    const before = await rows(d, 'SELECT id, name, tier, credit, email FROM qs_customers ORDER BY id')
+    const sql = insertStatements('qs_customers', ['id', 'name', 'tier', 'credit', 'email'], before, target.dialect)
     await run(d, 'DELETE FROM qs_orders')
     await run(d, 'DELETE FROM qs_customers')
     for (const stmt of sql.split('\n')) await run(d, stmt)
-    const after = await rows(d, 'SELECT id, name, plan, credit, email FROM qs_customers ORDER BY id')
+    const after = await rows(d, 'SELECT id, name, tier, credit, email FROM qs_customers ORDER BY id')
     expect(after.map((r) => r.map(String))).toEqual(before.map((r) => r.map(String)))
   })
 })
