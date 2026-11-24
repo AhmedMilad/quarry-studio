@@ -122,6 +122,41 @@ const READ_ONLY_PREFIX = /^\s*(select|show|explain|describe|desc|with|pragma|val
 export function isReadOnlyStatement(sql: string): boolean {
   return splitStatements(sql).every((s) => {
     const body = s.text.replace(/^(\s*(--[^\n]*\n|\/\*[\s\S]*?\*\/))*/g, '')
-    return READ_ONLY_PREFIX.test(body)
+    if (!READ_ONLY_PREFIX.test(body)) return false
+    // WITH … can lead into a write (WITH x AS (…) DELETE …): judge it by its main statement
+    if (/^\s*with\b/i.test(body)) return /^(select|values|table)$/i.test(mainKeywordAfterWith(body) ?? '')
+    return true
   })
+}
+
+/**
+ * The statement keyword that follows a WITH clause: the first SELECT / INSERT / UPDATE / DELETE / MERGE /
+ * VALUES / TABLE outside parentheses, quotes and comments (CTE bodies are inside parentheses).
+ */
+function mainKeywordAfterWith(sql: string): string | null {
+  let depth = 0
+  for (let i = 0; i < sql.length; i++) {
+    const c = sql[i]
+    if (c === '-' && sql[i + 1] === '-') {
+      const nl = sql.indexOf('\n', i)
+      if (nl < 0) return null
+      i = nl
+    } else if (c === '/' && sql[i + 1] === '*') {
+      const end = sql.indexOf('*/', i + 2)
+      if (end < 0) return null
+      i = end + 1
+    } else if (c === "'" || c === '"' || c === '`' || c === '[') {
+      const close = c === '[' ? ']' : c
+      let j = i + 1
+      while (j < sql.length && !(sql[j] === close && sql[j + 1] !== close)) j += sql[j] === close ? 2 : 1
+      i = j
+    } else if (c === '(') depth++
+    else if (c === ')') depth--
+    else if (depth === 0 && /[A-Za-z_]/.test(c) && !/[\w$]/.test(sql[i - 1] ?? ' ')) {
+      const word = /^[A-Za-z_][\w$]*/.exec(sql.slice(i))![0]
+      if (/^(select|insert|update|delete|merge|values|table)$/i.test(word) && i > 0) return word.toLowerCase()
+      i += word.length - 1
+    }
+  }
+  return null
 }

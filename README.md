@@ -22,7 +22,7 @@
 > (Claude Code), one feature request at a time. A human described the behaviour they wanted and
 > tested the result; the AI wrote the code. Every feature was checked in the running app, but the
 > code has not had a line-by-line human review. It has been used against real MySQL, PostgreSQL,
-> SQL Server and SQLite databases, but there is no automated test suite yet. Use it on production
+> SQL Server and SQLite databases, and has an automated test suite. Use it on production
 > databases with care, and bug reports are welcome.
 
 ![Table data with filters](docs/screenshots/table-data.png)
@@ -174,13 +174,30 @@ pnpm dev            # run with hot reload
 | Command | What it does |
 | --- | --- |
 | `pnpm dev` | Start the app in development mode with hot reload |
-| `pnpm typecheck` | Type-check the main and renderer code |
+| `pnpm typecheck` | Type-check the main and renderer code, and the tests |
+| `pnpm test` | Run the test suite (see below) |
 | `pnpm build` | Production bundle in `out/` |
 | `pnpm dist` | Linux AppImage and unpacked build in `release/` |
 
 > [!TIP]
 > VS Code's integrated terminal sets `ELECTRON_RUN_AS_NODE`, which stops Electron from opening a
 > window. If the app doesn't start, run `unset ELECTRON_RUN_AS_NODE` first.
+
+### Tests
+
+`pnpm test` runs [Vitest](https://vitest.dev) through Electron's Node, because the SQLite driver is compiled for Electron.
+
+- `tests/unit/`: the SQL splitter and read-only check, the UPDATE/DELETE analysis, exports and Copy as INSERT, and filters.
+- `tests/db/`: every driver against a real database. One set of checks covers browsing, foreign keys, filters, paging, applied edits and Copy as INSERT. Another compares each confirmation-dialog prediction with what really happens when the statement runs.
+
+SQLite always runs. To include the servers, point these at **throwaway** databases. The tests create and drop their own `qs_` tables.
+
+```bash
+export QS_TEST_MYSQL=mysql://user:pass@127.0.0.1:3306/qs_test
+export QS_TEST_POSTGRES=postgres://user:pass@127.0.0.1:5432/qs_test
+export QS_TEST_MSSQL=mssql://sa:pass@127.0.0.1:1433/master
+pnpm test
+```
 
 ## Project layout
 
@@ -215,7 +232,7 @@ src/
 
 ## Known limitations
 
-- **Testing:** checked by hand against real MySQL, PostgreSQL, SQL Server and SQLite databases. There is no automated test suite yet, and CockroachDB and Amazon Redshift (which use the PostgreSQL driver) haven't been tried.
+- **Testing:** MySQL, PostgreSQL, SQL Server and SQLite have been checked by hand and are covered by the automated tests (see [Tests](#tests)). CockroachDB and Amazon Redshift, which use the PostgreSQL driver, haven't been tried.
 - **Statement parsing:** the parser for the confirmation dialog handles common `UPDATE`/`DELETE` forms (CTEs, `USING`, `FROM`, `TOP`, `LIMIT`, `RETURNING`/`OUTPUT`). Unusual dialect-specific syntax may get an approximate count or none.
 - **Platforms:** packaging is set up for Linux only.
 

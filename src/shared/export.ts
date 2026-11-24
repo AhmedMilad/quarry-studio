@@ -74,5 +74,5 @@ export function selectSourceTable(sql: string): string | null {
   if (!m || m[2] === ',') return null
   // "FROM a, b" is a join too
   if (new RegExp(String.raw`\bfrom\s+${ident}(?:\s*\.\s*${ident}){0,2}(?:\s+(?:as\s+)?\w+)?\s*,`, 'i').test(body)) return null
-  return m[1].replace(/\s+/g, '')
+  return m[1].replace(/\s*\.\s*/g, '.') // `a . b` → `a.b`, keeping spaces inside quoted names
 }
