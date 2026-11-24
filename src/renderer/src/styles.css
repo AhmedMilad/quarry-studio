@@ -1799,3 +1799,12 @@ pre.ddl {
   flex-shrink: 0;
   opacity: 0.8;
 }
+
+/*
+ * Arrowing into the checkbox column focuses the checkbox; the cell's own selection outline already
+ * marks it, so drop the checkbox's focus ring instead of drawing a second, smaller square inside.
+ */
+.rdg.q-grid .rdg-checkbox-input:focus,
+.rdg.q-grid .rdg-checkbox-input:focus-visible {
+  outline: none;
+}
