@@ -90,6 +90,7 @@ function TableData({ sid, tab }: { sid: string; tab: TableTabState }): JSX.Eleme
     : tab.table.name
   const toast = useApp((s) => s.toast)
   const showMenu = useApp((s) => s.showMenu)
+  const isActive = useApp((s) => s.activeSid === sid && s.sessions[sid]?.activeTabId === tab.id && tab.view === 'data')
 
   const [meta, setMeta] = useState<ColumnInfo[]>([])
   const [data, setData] = useState<DataState>({ columns: [], rows: [], total: null, loading: true })
@@ -461,6 +462,16 @@ function TableData({ sid, tab }: { sid: string; tab: TableTabState }): JSX.Eleme
     const removeAt = at >= 0 ? at : filters.length - 1
     setFilters(filters.filter((_, j) => j !== removeAt))
     if (filters.length > 1) focusFilterRow(Math.max(0, removeAt - 1))
+    else focusGridSoon() // the last line (and the input that had focus) is gone
+  }
+
+  /** hand the keyboard back to the grid (after leaving or emptying the filter bar) */
+  const focusGridSoon = (): void => {
+    setTimeout(() => {
+      if (document.querySelector('.modal-backdrop')) return // e.g. "discard unsaved changes?" is asking
+      const wrap = filterBarRef.current?.closest('.tab-content')?.querySelector('.dt-wrap')
+      wrap?.dispatchEvent(new Event('quarry-focus-grid'))
+    }, 30)
   }
 
   const hasFilters = (): boolean =>
@@ -491,6 +502,7 @@ function TableData({ sid, tab }: { sid: string; tab: TableTabState }): JSX.Eleme
         if (pending.total > 0 && (applied.filters.length || applied.where)) guarded(clearFilters)()
         else clearFilters()
       }
+      focusGridSoon()
       return true
     }
     if (pending.total > 0) {
@@ -735,6 +747,11 @@ function TableData({ sid, tab }: { sid: string; tab: TableTabState }): JSX.Eleme
           <div className="results-msg error">
             <div className="error-box">{data.error}</div>
           </div>
+        ) : data.loading && data.columns.length === 0 ? (
+          // first load: no grid until the rows are here, so it never shows up empty with nothing to select
+          <div className="results-msg">
+            <Loader2 size={20} className="spin" />
+          </div>
         ) : (
           <div className="grid-wrap">
             <DataTable
@@ -754,6 +771,8 @@ function TableData({ sid, tab }: { sid: string; tab: TableTabState }): JSX.Eleme
               onSelectedRowsChange={setSelected}
               isEdited={isEdited}
               insertTarget={dialect ? { table: qualifiedName, dialect } : undefined}
+              autoSelectFirstCell
+              active={isActive}
               extraMenu={
                 editable
                   ? (row, key) => [

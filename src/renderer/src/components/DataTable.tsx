@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import DataGrid, { SelectColumn, type Column, type SortColumn } from 'react-data-grid'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import DataGrid, { SelectColumn, type Column, type DataGridHandle, type SortColumn } from 'react-data-grid'
 import 'react-data-grid/lib/styles.css'
 import { ArrowDown, ArrowUp, Braces, FileCode2, Link2, ClipboardPaste, Clipboard, Copy, Eraser, Eye, KeyRound, PenLine } from 'lucide-react'
 import type { CellValue, Dialect, ResultColumn } from '@shared/types'
@@ -68,6 +68,10 @@ interface Props {
   onSelectedRowsChange?: (s: Set<number>) => void
   isEdited?: (row: GridRow, key: string) => boolean
   extraMenu?: (row: GridRow, key: string) => MenuItem[]
+  /** select (and focus) the first data cell once rows first arrive, so the keyboard works straight away */
+  autoSelectFirstCell?: boolean
+  /** whether this grid's tab is the visible one; on becoming visible it takes keyboard focus back */
+  active?: boolean
   /** enables "Copy as INSERT": the (quoted, qualified) table name to insert into, and the SQL dialect */
   insertTarget?: { table: string; dialect: Dialect }
 }
@@ -92,6 +96,44 @@ export function DataTable(props: Props): JSX.Element {
   const multi = rangeSize > 1
 
   const rowIndex = useMemo(() => new Map(rows.map((r, i) => [r.__id, i])), [rows])
+
+  // first load: put the cursor on the first data cell (once per grid), before the first paint. Opening a table is deliberate, so this
+  // takes focus even from the sidebar search; only a dialog/palette or this tab's own filter bar keep it.
+  const gridRef = useRef<DataGridHandle>(null)
+  const autoSelected = useRef(false)
+  const pointerAt = useRef(0)
+  const activeRef = useRef(props.active)
+  const rowsLenRef = useRef(rows.length)
+  rowsLenRef.current = rows.length
+  activeRef.current = props.active
+  useLayoutEffect(() => {
+    if (!props.autoSelectFirstCell || autoSelected.current || !rows.length || !columns.length) return
+    const el = gridRef.current?.element
+    if (!el || el.offsetParent === null) return // tab not visible
+    const active = document.activeElement
+    if (active?.closest('.modal-backdrop, .palette')) return
+    if (active && active !== document.body && el.closest('.tab-content')?.contains(active) && !el.contains(active)) return
+    autoSelected.current = true
+    gridRef.current?.selectCell({ rowIdx: 0, idx: lead })
+  }, [props.autoSelectFirstCell, rows.length, columns.length, lead, props.active])
+
+  // tab became visible again (switched to, or the tab in front was closed): give the keyboard back to
+  // the selected cell, so arrows keep working without a mouse click. Only when focus isn't somewhere else.
+  useEffect(() => {
+    if (!props.active) return
+    const id = window.setTimeout(() => {
+      const el = gridRef.current?.element
+      if (!el || el.offsetParent === null || !rows.length) return
+      const a = document.activeElement
+      const lost = !a || a === document.body || (a as HTMLElement).offsetParent === null
+      if (!lost) return
+      const cell = el.querySelector<HTMLElement>('[role=gridcell][aria-selected=true]')
+      if (cell) cell.focus({ preventScroll: true })
+      else if (props.autoSelectFirstCell) gridRef.current?.selectCell({ rowIdx: 0, idx: lead })
+    }, 0)
+    return () => window.clearTimeout(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [props.active])
 
   // a new result set / page / column layout invalidates the range
   useEffect(() => setRange(null), [columns, rowOffset])
@@ -125,6 +167,20 @@ export function DataTable(props: Props): JSX.Element {
     el.addEventListener('quarry-clear-range', clear)
     return () => el.removeEventListener('quarry-clear-range', clear)
   }, [])
+
+  // 'quarry-focus-grid' (sent by the table tab when focus leaves the filter bar): keyboard back to the grid,
+  // on the selected cell, or the first data cell if none is selected yet
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const focusGrid = (): void => {
+      const cell = gridRef.current?.element?.querySelector<HTMLElement>('[role=gridcell][aria-selected=true]')
+      if (cell) cell.focus({ preventScroll: true })
+      else if (rowsLenRef.current) gridRef.current?.selectCell({ rowIdx: 0, idx: lead })
+    }
+    el.addEventListener('quarry-focus-grid', focusGrid)
+    return () => el.removeEventListener('quarry-focus-grid', focusGrid)
+  }, [lead])
 
   const rangeCells = useCallback((): { r: number; c: number }[] => {
     if (!b) return []
@@ -322,8 +378,35 @@ export function DataTable(props: Props): JSX.Element {
       onMouseDownCapture={onMouseDown}
       onMouseOver={onMouseOver}
       onKeyDownCapture={onKeyDownCapture}
+      onPointerDownCapture={() => (pointerAt.current = Date.now())}
+      onBlur={(e) => {
+        // focus fell out of the grid to nowhere (the focused cell was re-rendered away, a menu closed…):
+        // put it back on the selected cell so the arrow keys keep working
+        if (!props.autoSelectFirstCell || e.relatedTarget) return
+        window.setTimeout(() => {
+          const a = document.activeElement
+          if ((a && a !== document.body) || !activeRef.current || !document.hasFocus()) return
+          const el = gridRef.current?.element
+          if (!el || el.offsetParent === null) return
+          el.querySelector<HTMLElement>('[role=gridcell][aria-selected=true]')?.focus({ preventScroll: true })
+        }, 50)
+      }}
+      onFocusCapture={(e) => {
+        // Keyboard focus entering the grid while no data cell is selected (Tab, focus coming back…) makes the
+        // grid select the first *header* cell, i.e. the select-all checkbox. Start on the first data cell instead.
+        // Real clicks on a header (sorting, ticking all rows) are left alone.
+        if (!props.autoSelectFirstCell || !rows.length || Date.now() - pointerAt.current < 500) return
+        // moving inside the grid (e.g. Up from the first row onto the column headers) is deliberate
+        const from = e.relatedTarget as Node | null
+        if (from && e.currentTarget.contains(from)) return
+        const t = e.target as HTMLElement
+        if (t !== gridRef.current?.element && !t.closest('[role=columnheader]')) return
+        if (e.currentTarget.querySelector('[role=gridcell][aria-selected=true]')) return
+        window.setTimeout(() => gridRef.current?.selectCell({ rowIdx: 0, idx: lead }), 0)
+      }}
     >
       <DataGrid<GridRow, unknown, number>
+        ref={gridRef}
         className={`q-grid ${isDark ? 'rdg-dark' : 'rdg-light'}`}
         columns={gridColumns}
         rows={rows}

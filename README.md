@@ -73,7 +73,7 @@ Delete confirmations are red and update confirmations are light blue. **Cancel**
 
 ### Table data
 
-- Paged rows with server-side sorting.
+- Paged rows with server-side sorting. When a table opens, its first cell is selected, so you can move around with the arrow keys straight away.
 - **Filters:** use the builder, which matches **ALL (AND)** or **ANY (OR)** of its lines, or type a raw `WHERE` clause. Lines with an empty value are ignored. For `IS NULL` / `IS NOT NULL` the value field is disabled.
 - **Inline editing** of cells, plus adding, cloning and deleting rows and setting values to NULL. Changes are highlighted and stay pending until you **apply them in one transaction** (`Ctrl+S`), or discard them (`Esc`).
 - **Range selection:** drag, `Shift+click` or `Shift+arrows` to select cells. Copy them as TSV, paste a block (a single value fills the whole range), or set them all to NULL. A badge shows the count, sum, average, minimum and maximum.
