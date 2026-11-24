@@ -107,7 +107,7 @@ export async function resetFixture(d: BaseDriver): Promise<void> {
   const engine = d.dialect === 'mysql' ? ' ENGINE=InnoDB' : ''
   await run(
     d,
-    `CREATE TABLE qs_customers (id INT NOT NULL PRIMARY KEY, name ${text} NOT NULL, tier ${text}, credit INT NOT NULL, email ${text} UNIQUE)${engine}`
+    `CREATE TABLE qs_customers (id INT NOT NULL PRIMARY KEY, name ${text} NOT NULL, tier ${text}, credit INT NOT NULL, email ${text})${engine}`
   )
   await run(
     d,
