@@ -41,6 +41,11 @@ describe('analyzeDestructive', () => {
     expect(u.changingSql).toContain('<=>') // MySQL null-safe equality
   })
 
+  it('UPDATE: SQL Server compares old and new values NULL-safely', () => {
+    const [u] = analyzeDestructive('UPDATE t SET email = NULL', 'mssql')
+    expect(u.changingSql).toContain('INTERSECT')
+  })
+
   it('UPDATE: commas inside expressions do not split the SET list', () => {
     const [u] = analyzeDestructive("UPDATE t SET a = COALESCE(b, 'x,y'), c = 1", 'postgres')
     expect(u.assignments?.map((a) => a.column)).toEqual(['a', 'c'])

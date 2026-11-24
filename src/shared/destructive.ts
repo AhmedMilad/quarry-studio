@@ -314,7 +314,9 @@ function nullSafeEq(a: string, b: string, dialect: Dialect): string {
     case 'sqlite':
       return `${a} IS (${b})`
     case 'mssql':
-      return `(${a} = (${b}) OR (${a} IS NULL AND (${b}) IS NULL))`
+      // no null-safe operator in T-SQL; `a = b OR (a IS NULL AND b IS NULL)` is UNKNOWN (not FALSE) when only
+      // one side is NULL, so NOT (…) never counted those rows. INTERSECT compares NULLs as equal.
+      return `EXISTS (SELECT ${a} INTERSECT SELECT (${b}))`
   }
 }
 
