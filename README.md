@@ -135,7 +135,7 @@ The Electron code is cross-platform, so macOS and Windows builds should work wit
 
 | Shortcut | Action |
 | --- | --- |
-| `Ctrl+P` | Quick open: tables, views, saved queries, connections (`Shift+Enter` opens a table's structure, `Ctrl+Enter` opens it in a new tab) |
+| `Ctrl+P` | Quick open: connections when none is active, the server's databases when no database is selected yet, otherwise tables, views, saved queries and connections (`Shift+Enter` opens a table's structure, `Ctrl+Enter` opens it in a new tab) |
 | `Ctrl+Enter` / `Ctrl+Shift+Enter` | Run the current statement or selection / run all |
 | `Ctrl+S` | Save the query in a query tab; apply pending changes in a table tab |
 | `Ctrl+Shift+F` | Format SQL |

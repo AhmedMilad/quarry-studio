@@ -395,3 +395,6 @@ export const useApp = create<AppState>((set, get) => {
     }
   }
 })
+
+// test builds only (VITE_SMOKE=1 at build time): lets the smoke tests drive the store
+if (import.meta.env.VITE_SMOKE) (window as unknown as { __app: typeof useApp }).__app = useApp

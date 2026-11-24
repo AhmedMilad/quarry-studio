@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ArrowRightLeft, Eye, Plug, Search, Star, Table2 } from 'lucide-react'
+import { ArrowRightLeft, Database, Eye, Plug, Search, Star, Table2 } from 'lucide-react'
 import type { SavedQuery } from '@shared/types'
 import { api } from '../api'
 import { useApp } from '../store'
@@ -48,10 +48,25 @@ export function Palette({ onClose }: { onClose: () => void }): JSX.Element {
     api.listSaved().then(setSaved).catch(() => undefined)
   }, [])
 
+  // a server connection with no database chosen yet (e.g. MySQL connected without a default database):
+  // list its databases first, then tables once one is picked
+  const pickDatabase = !!session && session.info.dialect !== 'sqlite' && !session.info.currentDatabase
+
   const items = useMemo<Item[]>(() => {
     const st = useApp.getState()
     const out: Item[] = []
-    if (session && activeSid) {
+    if (session && activeSid && pickDatabase) {
+      for (const d of session.databases) {
+        out.push({
+          key: `d:${d}`,
+          label: d,
+          detail: 'use database',
+          group: 'Databases',
+          icon: <Database size={14} color="var(--accent)" />,
+          run: () => void st.useDatabase(activeSid, d)
+        })
+      }
+    } else if (session && activeSid) {
       for (const t of session.tables) {
         out.push({
           key: `t:${t.schema}:${t.name}`,
@@ -97,7 +112,7 @@ export function Palette({ onClose }: { onClose: () => void }): JSX.Element {
       })
     }
     return out
-  }, [session, activeSid, saved, order, sessions, connections])
+  }, [session, activeSid, pickDatabase, saved, order, sessions, connections])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -128,7 +143,9 @@ export function Palette({ onClose }: { onClose: () => void }): JSX.Element {
           <Search size={15} className="faint" />
           <input
             autoFocus
-            placeholder={session ? 'Search tables, views, saved queries, connections…' : 'Search connections…'}
+            placeholder={
+              pickDatabase ? 'Select a database…' : session ? 'Search tables, views, saved queries, connections…' : 'Search connections…'
+            }
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => {
