@@ -54,11 +54,28 @@ jobs:
       - run: pnpm typecheck
       - name: Tests
         # github-actions reporter: failures show up as annotations on the run page
-        run: pnpm test --reporter=default --reporter=github-actions
+        run: |
+          set -o pipefail
+          pnpm test --reporter=default --reporter=github-actions 2>&1 | tee test-output.log
         env:
           QS_TEST_MYSQL: mysql://root:quarry@127.0.0.1:3306/qs_test
           QS_TEST_POSTGRES: postgres://postgres:quarry@127.0.0.1:5432/qs_test
           QS_TEST_MSSQL: mssql://sa:Quarry_Test_Pass1@127.0.0.1:1433/master
+      - name: Show failing test output
+        if: failure()
+        # job logs need admin rights to download; annotations are public, so surface the failures there
+        run: |
+          python3 - <<'PY'
+          import re
+          log = open('test-output.log', encoding='utf-8', errors='replace').read()
+          log = re.sub(r'\x1b\[[0-9;]*m', '', log)
+          lines = [l for l in log.splitlines() if l.strip()]
+          keep = [l for l in lines if re.search(r'FAIL|Error|expected|Received|Expected|❯|×|failed', l)]
+          for title, chunk in (('Test failures', keep[:120]), ('End of test output', lines[-80:])):
+              text = '\n'.join(chunk)[-60000:]
+              text = text.replace('%', '%25').replace('\r', '').replace('\n', '%0A')
+              print(f'::error title={title}::{text}')
+          PY
 
   build:
     name: Build (${{ matrix.os }})
