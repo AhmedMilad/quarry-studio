@@ -77,6 +77,12 @@ describe('analyzeDestructive', () => {
     expect(d.countSql).toBeNull()
   })
 
+  it('comments anywhere are ignored, but comment-like text inside strings is kept', () => {
+    const [d] = analyzeDestructive("DELETE FROM t /* why? */ WHERE a = '-- not a comment' -- trailing", 'postgres')
+    expect(d.where).toBe("a = '-- not a comment'")
+    expect(d.countSql).not.toContain('why')
+  })
+
   it('leading comments do not hide a statement', () => {
     expect(analyzeDestructive('-- careful\n/* really */ DELETE FROM t', 'sqlite')).toHaveLength(1)
   })

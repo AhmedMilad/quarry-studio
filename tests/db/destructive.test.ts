@@ -39,6 +39,32 @@ const CASES: Case[] = [
     count: 3,
     cascaded: 6
   },
+  // comments, strings and nesting that must not confuse the analysis
+  { sql: "DELETE FROM qs_customers /* why? */ WHERE plan = 'free' -- trailing", count: 3, cascaded: 6 },
+  { sql: "delete\nfrom\n  qs_customers\nwhere plan='free'", count: 3, cascaded: 6 },
+  { sql: "DELETE FROM qs_customers WHERE name = 'a;b WHERE x -- y' OR plan = 'free'", count: 3, cascaded: 6 },
+  { sql: "UPDATE qs_customers SET email = 'set where from' WHERE id = 1", count: 1, changing: 1 },
+  {
+    sql: 'UPDATE qs_customers SET credit = (SELECT COUNT(*) FROM qs_orders o WHERE o.customer_id = qs_customers.id)',
+    count: 10,
+    changing: 10,
+    matchesAll: true
+  },
+  { sql: "UPDATE qs_customers SET plan = CASE WHEN credit > 50 THEN 'pro' ELSE plan END", count: 10, changing: 3, matchesAll: true },
+  { sql: "UPDATE qs_customers SET name = 'x' WHERE (plan = 'free' OR plan = 'pro') AND credit < 40", count: 2, changing: 2 },
+  {
+    sql: "DELETE FROM qs_customers WHERE NOT EXISTS (SELECT 1 FROM qs_orders o WHERE o.customer_id = qs_customers.id AND o.status = 'paid')",
+    count: 5,
+    cascaded: 10
+  },
+  { sql: 'DELETE FROM "qs_customers" WHERE "plan" = \'free\'', count: 3, only: ['postgres', 'sqlite'] },
+  { sql: "UPDATE qs_customers AS c SET credit = 0 WHERE c.plan = 'pro'", count: 4, changing: 4, only: ['postgres', 'sqlite', 'mysql'] },
+  { sql: 'DELETE FROM qs_customers WHERE id IN (1, 2) RETURNING id', count: 2, only: ['postgres', 'sqlite'] },
+  {
+    sql: 'WITH RECURSIVE n(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM n WHERE i < 3) DELETE FROM qs_customers WHERE id IN (SELECT i FROM n)',
+    count: 3,
+    only: ['postgres', 'sqlite', 'mysql']
+  },
   // dialect-specific forms
   { sql: "DELETE FROM qs_customers WHERE plan = 'free' ORDER BY id LIMIT 2", count: 2, only: ['mysql'] },
   { sql: "UPDATE qs_customers SET credit = 0 WHERE plan = 'pro' ORDER BY id LIMIT 3", count: 3, only: ['mysql'] },

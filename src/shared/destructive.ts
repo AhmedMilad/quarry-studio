@@ -71,20 +71,36 @@ function parseTable(text: string): ParsedTable {
   }
 }
 
-function stripLeadingComments(s: string): string {
-  let t = s
-  for (;;) {
-    t = t.trimStart()
-    if (t.startsWith('--')) {
-      const nl = t.indexOf('\n')
-      if (nl < 0) return ''
-      t = t.slice(nl + 1)
-    } else if (t.startsWith('/*')) {
-      const end = t.indexOf('*/')
-      if (end < 0) return ''
-      t = t.slice(end + 2)
-    } else return t
+/**
+ * Remove every comment outside string literals and quoted identifiers, so a comment anywhere in the
+ * statement (e.g. `DELETE FROM t /* note *\/ WHERE …`) can't hide or split a clause.
+ */
+function stripComments(sql: string): string {
+  let out = ''
+  for (let i = 0; i < sql.length; i++) {
+    const c = sql[i]
+    if (c === '-' && sql[i + 1] === '-') {
+      const nl = sql.indexOf('\n', i)
+      i = nl < 0 ? sql.length : nl - 1
+      out += ' '
+    } else if (c === '/' && sql[i + 1] === '*') {
+      const end = sql.indexOf('*/', i + 2)
+      i = end < 0 ? sql.length : end + 1
+      out += ' '
+    } else if (c === "'" || c === '"' || c === '`' || c === '[') {
+      const close = c === '[' ? ']' : c
+      let j = i + 1
+      while (j < sql.length) {
+        if (sql[j] === close) {
+          if (sql[j + 1] === close) j += 2 // doubled quote = escaped
+          else break
+        } else j++
+      }
+      out += sql.slice(i, j + 1)
+      i = j
+    } else out += c
   }
+  return out.trim()
 }
 
 function previewOf(base: string, dialect: Dialect, n = 5): string {
@@ -476,7 +492,7 @@ function topLevelKeyword(sql: string, kw: string): number {
 export function analyzeDestructive(sql: string, dialect: Dialect): DestructiveStatement[] {
   const out: DestructiveStatement[] = []
   splitStatements(sql).forEach((s, index) => {
-    const stmt = stripLeadingComments(s.text).replace(/;\s*$/, '')
+    const stmt = stripComments(s.text).replace(/;\s*$/, '')
     if (/^WITH\b/i.test(stmt)) {
       const upd = topLevelKeyword(stmt, 'UPDATE')
       const del = topLevelKeyword(stmt, 'DELETE')
