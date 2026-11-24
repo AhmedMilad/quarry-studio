@@ -113,23 +113,18 @@ Export query results or whole tables (with your filters applied) as **CSV, JSON,
 
 ## Install
 
-Only Linux builds are produced at the moment.
+CI builds Quarry Studio for **Linux** (AppImage), **Windows** (installer) and **macOS** (dmg) on every push. Get them from the run's artifacts on the [Actions](https://github.com/AhmedMilad/quarry-studio/actions) tab, or from [Releases](https://github.com/AhmedMilad/quarry-studio/releases) for tagged versions (pushing a `v*` tag publishes one).
 
-1. Build it (see [Build from source](#build-from-source)). This creates `release/Quarry Studio-1.0.0.AppImage` and an unpacked build.
-2. Run the unpacked build directly:
+The Windows and macOS builds aren't code-signed. Windows SmartScreen will warn ("More info" → "Run anyway"). On macOS, right-click the app → Open the first time.
 
-   ```bash
-   ./release/linux-unpacked/quarry-studio
-   ```
+**Linux:** the AppImage needs FUSE 2 (on Ubuntu 24.04+, `sudo apt install libfuse2t64`):
 
-   Or run the AppImage. It needs FUSE 2: on Ubuntu 24.04+, `sudo apt install libfuse2t64`.
+```bash
+chmod +x "Quarry Studio-1.0.0.AppImage"
+"./Quarry Studio-1.0.0.AppImage"
+```
 
-   ```bash
-   chmod +x "release/Quarry Studio-1.0.0.AppImage"
-   "./release/Quarry Studio-1.0.0.AppImage"
-   ```
-
-The Electron code is cross-platform, so macOS and Windows builds should work with an `electron-builder` target for them, but they haven't been tried.
+Building it yourself (see [Build from source](#build-from-source)) also gives you an unpacked build you can run without FUSE: `./release/linux-unpacked/quarry-studio`.
 
 ## Keyboard shortcuts
 
@@ -178,6 +173,7 @@ pnpm dev            # run with hot reload
 | `pnpm test` | Run the test suite (see below) |
 | `pnpm build` | Production bundle in `out/` |
 | `pnpm dist` | Linux AppImage and unpacked build in `release/` |
+| `pnpm dist:win` / `pnpm dist:mac` | Windows installer / macOS dmg (run on that OS) |
 
 > [!TIP]
 > VS Code's integrated terminal sets `ELECTRON_RUN_AS_NODE`, which stops Electron from opening a
@@ -206,6 +202,7 @@ src/
 ├── main/                 Electron main process
 │   ├── index.ts          window, menu, IPC handlers, sessions, export, destructive-query checks
 │   ├── drivers/          one driver per database family, all extending BaseDriver
+│   ├── destructive-check.ts  runs the read-only queries behind the UPDATE/DELETE confirmation
 │   ├── tunnel.ts         SSH tunnels (ssh2)
 │   ├── store.ts          saved connections, queries, history, settings (JSON + safeStorage)
 │   └── xlsx.ts           Excel export (ExcelJS)
@@ -221,6 +218,11 @@ src/
     ├── commands.ts       command bus that routes shortcuts to the active tab
     ├── monaco.ts         editor themes and the SQL completion provider
     └── components/       Rail, Sidebar, Workspace, QueryTab, TableTab, DataTable, …
+        └── table/        FilterBar, TableStructure, useForeignKeyLinks (pieces of the table tab)
+tests/
+├── unit/                 splitter, read-only check, UPDATE/DELETE analysis, exports, filters
+├── db/                   driver contract + confirmation-dialog predictions vs. reality
+└── helpers/              database targets and the shared fixture
 ```
 
 ## How it works
@@ -234,7 +236,7 @@ src/
 
 - **Testing:** MySQL, PostgreSQL, SQL Server and SQLite have been checked by hand and are covered by the automated tests (see [Tests](#tests)). CockroachDB and Amazon Redshift, which use the PostgreSQL driver, haven't been tried.
 - **Statement parsing:** the parser for the confirmation dialog handles common `UPDATE`/`DELETE` forms (CTEs, `USING`, `FROM`, `TOP`, `LIMIT`, `RETURNING`/`OUTPUT`). Unusual dialect-specific syntax may get an approximate count or none.
-- **Platforms:** packaging is set up for Linux only.
+- **Platforms:** Windows and macOS builds come from CI and aren't code-signed. Day-to-day use has been on Linux.
 
 ## Contributing
 

@@ -5,15 +5,10 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  Clipboard,
-  Code2,
   Columns3,
   CopyPlus,
   Download,
-  Filter,
-  KeyRound,
   Loader2,
-  Minus,
   Plus,
   RefreshCw,
   Save,
@@ -28,18 +23,17 @@ import type {
   ColumnInfo,
   ExportFormat,
   FilterCondition,
-  ForeignKeyInfo,
-  IndexInfo,
   RowChanges
 } from '@shared/types'
-import { filterNeedsValue, isActiveFilter } from '@shared/types'
+import { isActiveFilter } from '@shared/types'
 import { api } from '../api'
 import { useApp, type TableTabState } from '../store'
 import { registerTabCommands } from '../commands'
 import { DataTable, colKey, rowValues, toGridRows, type GridColumn, type GridRow } from './DataTable'
+import { FilterBar } from './table/FilterBar'
+import { TableStructure } from './table/TableStructure'
+import { useForeignKeyLinks } from './table/useForeignKeyLinks'
 import { formatTsv, quoteId } from '@shared/export'
-
-const OPS = ['=', '!=', '<', '>', '<=', '>=', 'LIKE', 'NOT LIKE', 'IN', 'NOT IN', 'IS NULL', 'IS NOT NULL']
 
 export function TableTab({ sid, tab }: { sid: string; tab: TableTabState }): JSX.Element {
   const updateTab = useApp((s) => s.updateTab)
@@ -120,40 +114,10 @@ function TableData({ sid, tab }: { sid: string; tab: TableTabState }): JSX.Eleme
       .listColumns(sid, tab.table)
       .then(setMeta)
       .catch(() => setMeta([]))
-    api
-      .listForeignKeys(sid, tab.table)
-      .then(setFks)
-      .catch(() => setFks([]))
   }, [sid, tab.table])
 
-  // ---- foreign keys: clicking a value opens the referenced row in a new tab ----
-  const [fks, setFks] = useState<ForeignKeyInfo[]>([])
-  const sessionTables = useApp((s) => s.sessions[sid]?.tables)
-  const openTableTab = useApp((s) => s.openTableTab)
-  const followFk = useCallback(
-    async (group: ForeignKeyInfo[], row: GridRow) => {
-      const ref = group[0]
-      const refTable = { name: ref.refTable, schema: ref.refSchema ?? tab.table.schema }
-      let refCols = group.map((f) => f.refColumn)
-      // SQLite allows "REFERENCES t" without a column: that means t's primary key
-      if (refCols.some((c) => !c)) {
-        const pk = (await api.listColumns(sid, refTable).catch(() => [])).filter((c) => c.primaryKey).map((c) => c.name)
-        refCols = refCols.map((c, i) => c || pk[i] || '')
-      }
-      const filters: FilterCondition[] = []
-      for (let i = 0; i < group.length; i++) {
-        const idx = data.columns.findIndex((c) => c.name === group[i].column)
-        const v = idx >= 0 ? row[colKey(idx)] : null
-        if (v === null || v === undefined || !refCols[i]) return
-        filters.push({ column: refCols[i], op: '=', value: String(v) })
-      }
-      const info =
-        sessionTables?.find((t) => t.name === refTable.name && (!refTable.schema || !t.schema || t.schema === refTable.schema)) ??
-        { ...refTable, type: 'table' as const }
-      openTableTab(sid, info, 'data', true, filters)
-    },
-    [sid, tab.table.schema, data.columns, sessionTables, openTableTab]
-  )
+  // foreign-key values are links to the referenced row
+  const fkLinks = useForeignKeyLinks(sid, tab, data.columns)
 
   const load = useCallback(async () => {
     setData((d) => ({ ...d, loading: true, error: undefined }))
@@ -187,22 +151,13 @@ function TableData({ sid, tab }: { sid: string; tab: TableTabState }): JSX.Eleme
 
   const columns = useMemo<GridColumn[]>(() => {
     const byName = new Map(meta.map((m) => [m.name, m]))
-    // group FK columns by constraint so composite keys follow all their columns at once
-    const groups = new Map<string, ForeignKeyInfo[]>()
-    for (const f of fks) groups.set(f.name, [...(groups.get(f.name) ?? []), f])
-    const fkByColumn = new Map<string, ForeignKeyInfo[]>()
-    for (const g of groups.values()) for (const f of g) if (!fkByColumn.has(f.column)) fkByColumn.set(f.column, g)
-    return data.columns.map((c) => {
-      const g = fkByColumn.get(c.name)
-      const ref = g?.find((f) => f.column === c.name)
-      return {
-        ...c,
-        type: byName.get(c.name)?.dataType ?? c.type,
-        pk: byName.get(c.name)?.primaryKey,
-        fk: g && ref ? { target: `${ref.refTable}${ref.refColumn ? '.' + ref.refColumn : ''}`, open: (row: GridRow) => void followFk(g, row) } : undefined
-      }
-    })
-  }, [data.columns, meta, fks, followFk])
+    return data.columns.map((c) => ({
+      ...c,
+      type: byName.get(c.name)?.dataType ?? c.type,
+      pk: byName.get(c.name)?.primaryKey,
+      fk: fkLinks.get(c.name)
+    }))
+  }, [data.columns, meta, fkLinks])
 
   // ---- pending change tracking ----
   const isEdited = useCallback((row: GridRow, key: string): boolean => {
@@ -627,119 +582,21 @@ function TableData({ sid, tab }: { sid: string; tab: TableTabState }): JSX.Eleme
 
   return (
     <>
-      <div className="filter-bar" ref={filterBarRef}>
-        <div className="filter-row">
-          <div className="seg">
-            <button className={filterMode === 'builder' ? 'active' : ''} onClick={() => setFilterMode('builder')}>
-              <Filter size={12} /> Builder
-            </button>
-            <button className={filterMode === 'raw' ? 'active' : ''} onClick={() => setFilterMode('raw')}>
-              <Code2 size={12} /> SQL
-            </button>
-          </div>
-          {filterMode === 'raw' ? (
-            <input
-              className="q-input sm mono"
-              placeholder="WHERE clause, e.g. id > 10 AND status = 'active'"
-              value={rawWhere}
-              onChange={(e) => setRawWhere(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && guarded(() => applyFilters())()}
-            />
-          ) : filters.length === 0 ? (
-            <button className="btn sm ghost" onClick={() => setFilters([{ column: columns[0]?.name ?? '', op: '=', value: '' }])}>
-              <Plus size={12} /> Add filter
-            </button>
-          ) : (
-            <>
-              <span className="faint" style={{ fontSize: 12 }}>
-                Match
-              </span>
-              <div className="seg" title="How conditions are combined">
-                <button className={join === 'AND' ? 'active' : ''} onClick={() => changeJoin('AND')}>
-                  ALL (AND)
-                </button>
-                <button className={join === 'OR' ? 'active' : ''} onClick={() => changeJoin('OR')}>
-                  ANY (OR)
-                </button>
-              </div>
-              <span className="faint" style={{ fontSize: 12 }}>
-                {filters.length} condition{filters.length > 1 ? 's' : ''}
-              </span>
-            </>
-          )}
-          <span className="spacer" />
-          <button className="btn sm" onClick={guarded(() => applyFilters())}>
-            Apply
-          </button>
-          <button
-            className="btn sm ghost"
-            title={activeFilterCount > 0 ? 'Clear filters (Esc)' : 'No filter applied'}
-            disabled={activeFilterCount === 0}
-            onClick={guarded(clearFilters)}
-          >
-            <X size={12} /> Clear
-          </button>
-        </div>
-        {filterMode === 'builder' &&
-          filters.map((f, i) => (
-            <div className="filter-row" key={i}>
-              <button
-                className={`join-pill${i === 0 ? ' first' : ''}`}
-                disabled={i === 0}
-                title={i === 0 ? undefined : 'Click to switch between AND / OR'}
-                onClick={() => changeJoin(join === 'AND' ? 'OR' : 'AND')}
-              >
-                {i === 0 ? 'WHERE' : join}
-              </button>
-              <select
-                className="select sm"
-                value={f.column}
-                onChange={(e) => setFilters(filters.map((x, j) => (j === i ? { ...x, column: e.target.value } : x)))}
-              >
-                {columns.map((c) => (
-                  <option key={c.name} value={c.name}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              <select
-                className="select sm"
-                value={f.op}
-                onChange={(e) => setFilters(filters.map((x, j) => (j === i ? { ...x, op: e.target.value } : x)))}
-              >
-                {OPS.map((o) => (
-                  <option key={o} value={o}>
-                    {o}
-                  </option>
-                ))}
-              </select>
-              {/* operators like IS NULL take no value: keep the field in place (disabled) so the row doesn't reflow */}
-              <input
-                className="q-input sm mono"
-                disabled={!filterNeedsValue(f.op)}
-                title={filterNeedsValue(f.op) ? undefined : `${f.op} doesn't take a value`}
-                placeholder={
-                  !filterNeedsValue(f.op) ? 'no value needed' : f.op.includes('IN') ? 'comma,separated,values' : f.op.includes('LIKE') ? '%text%' : 'value'
-                }
-                value={filterNeedsValue(f.op) ? f.value : ''}
-                onChange={(e) => setFilters(filters.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))}
-                onKeyDown={(e) => e.key === 'Enter' && guarded(() => applyFilters())()}
-              />
-              <button className="icon-btn" title="Remove line (Ctrl+Shift+L)" onClick={() => setFilters(filters.filter((_, j) => j !== i))}>
-                <Minus size={13} />
-              </button>
-              {i === filters.length - 1 && (
-                <button
-                  className="icon-btn"
-                  title="Add line (Ctrl+L)"
-                  onClick={() => setFilters([...filters, { column: columns[0]?.name ?? '', op: '=', value: '' }])}
-                >
-                  <Plus size={13} />
-                </button>
-              )}
-            </div>
-          ))}
-      </div>
+      <FilterBar
+        barRef={filterBarRef}
+        columns={columns}
+        filters={filters}
+        setFilters={setFilters}
+        mode={filterMode}
+        setMode={setFilterMode}
+        rawWhere={rawWhere}
+        setRawWhere={setRawWhere}
+        join={join}
+        changeJoin={changeJoin}
+        activeCount={activeFilterCount}
+        onApply={guarded(() => applyFilters())}
+        onClear={guarded(clearFilters)}
+      />
 
       <div className="results-body">
         {data.loading && <div className="loading-bar" style={{ position: 'absolute', left: 0, right: 0, top: 0, zIndex: 3 }} />}
@@ -870,160 +727,5 @@ function TableData({ sid, tab }: { sid: string; tab: TableTabState }): JSX.Eleme
         </button>
       </div>
     </>
-  )
-}
-
-function TableStructure({ sid, tab }: { sid: string; tab: TableTabState }): JSX.Element {
-  const openQueryTab = useApp((s) => s.openQueryTab)
-  const toast = useApp((s) => s.toast)
-  const [cols, setCols] = useState<ColumnInfo[] | null>(null)
-  const [idx, setIdx] = useState<IndexInfo[]>([])
-  const [fks, setFks] = useState<ForeignKeyInfo[]>([])
-  const [ddl, setDdl] = useState('')
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    Promise.all([
-      api.listColumns(sid, tab.table),
-      api.listIndexes(sid, tab.table).catch(() => []),
-      api.listForeignKeys(sid, tab.table).catch(() => []),
-      api.getDDL(sid, tab.table, tab.tableType).catch((e) => `-- Could not generate DDL: ${e.message}`)
-    ])
-      .then(([c, i, f, d]) => {
-        setCols(c)
-        setIdx(i)
-        setFks(f)
-        setDdl(d)
-      })
-      .catch((e) => setError(e.message))
-  }, [sid, tab.table, tab.tableType])
-
-  if (error) return <div className="results-msg error"><div className="error-box">{error}</div></div>
-  if (!cols) return <div className="results-msg"><Loader2 size={20} className="spin" /></div>
-
-  return (
-    <div className="structure">
-      <h3>
-        Columns <span className="badge">{cols.length}</span>
-      </h3>
-      <table className="meta">
-        <thead>
-          <tr>
-            <th style={{ width: 36 }}>#</th>
-            <th>Name</th>
-            <th>Type</th>
-            <th>Nullable</th>
-            <th>Default</th>
-            <th>Extra</th>
-          </tr>
-        </thead>
-        <tbody>
-          {cols.map((c) => (
-            <tr key={c.name}>
-              <td className="faint">{c.ordinal}</td>
-              <td className="mono">
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  {c.primaryKey && <KeyRound size={12} color="var(--accent)" />}
-                  {c.name}
-                </span>
-              </td>
-              <td className="mono muted">{c.dataType}</td>
-              <td>{c.nullable ? <span className="muted">YES</span> : <b>NO</b>}</td>
-              <td className="mono muted">{c.defaultValue ?? <span className="cell-null">NULL</span>}</td>
-              <td>
-                <span style={{ display: 'inline-flex', gap: 4, flexWrap: 'wrap' }}>
-                  {c.primaryKey && <span className="badge accent">PK</span>}
-                  {c.autoIncrement && <span className="badge">auto</span>}
-                  {c.comment && <span className="muted">{c.comment}</span>}
-                </span>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      <h3>
-        Indexes <span className="badge">{idx.length}</span>
-      </h3>
-      {idx.length ? (
-        <table className="meta">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Columns</th>
-              <th>Unique</th>
-              <th>Type</th>
-            </tr>
-          </thead>
-          <tbody>
-            {idx.map((i) => (
-              <tr key={i.name}>
-                <td className="mono">
-                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                    {i.primary && <KeyRound size={12} color="var(--accent)" />}
-                    {i.name}
-                  </span>
-                </td>
-                <td className="mono muted">{i.columns.join(', ')}</td>
-                <td>{i.unique ? 'YES' : <span className="muted">NO</span>}</td>
-                <td className="muted">{i.type}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <div className="faint">No indexes</div>
-      )}
-
-      <h3>
-        Foreign keys <span className="badge">{fks.length}</span>
-      </h3>
-      {fks.length ? (
-        <table className="meta">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Column</th>
-              <th>References</th>
-              <th>On update</th>
-              <th>On delete</th>
-            </tr>
-          </thead>
-          <tbody>
-            {fks.map((f, i) => (
-              <tr key={`${f.name}-${i}`}>
-                <td className="mono">{f.name}</td>
-                <td className="mono">{f.column}</td>
-                <td className="mono muted">
-                  {f.refTable}.{f.refColumn}
-                </td>
-                <td className="muted">{f.onUpdate}</td>
-                <td className="muted">{f.onDelete}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : (
-        <div className="faint">No foreign keys</div>
-      )}
-
-      <h3>
-        DDL
-        <span className="spacer" />
-        <button
-          className="btn sm"
-          onClick={() => {
-            navigator.clipboard.writeText(ddl)
-            toast('DDL copied', 'success')
-          }}
-        >
-          <Clipboard size={12} /> Copy
-        </button>
-        <button className="btn sm" onClick={() => openQueryTab(sid, ddl, `${tab.table.name} DDL`)}>
-          <Code2 size={12} /> Open in editor
-        </button>
-      </h3>
-      <pre className="ddl">{ddl}</pre>
-    </div>
   )
 }
