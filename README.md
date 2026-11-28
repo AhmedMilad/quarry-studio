@@ -132,6 +132,7 @@ Building it yourself (see [Build from source](#build-from-source)) also gives yo
 | Shortcut | Action |
 | --- | --- |
 | `Ctrl+P` | Quick open: connections when none is active, the server's databases when no database is selected yet, otherwise tables, views, saved queries and connections (`Shift+Enter` opens a table's structure, `Ctrl+Enter` opens it in a new tab) |
+| `Ctrl+Shift+P` | Switch database: the connection's databases (current one first); type to filter, Enter to switch |
 | `Ctrl+Enter` / `Ctrl+Shift+Enter` | Run the current statement or selection / run all |
 | `Ctrl+S` | Save the query in a query tab; apply pending changes in a table tab |
 | `Ctrl+Shift+I` / `Ctrl+Shift+F` | Format SQL |

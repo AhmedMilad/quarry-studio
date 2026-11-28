@@ -231,6 +231,7 @@ export function Workspace({ sid, visible }: { sid: string; visible: boolean }): 
               <span className="kbd">Ctrl+S</span> <span>Save query</span>
               <span className="kbd">Ctrl+Shift+I</span> <span>Format SQL (or Ctrl+Shift+F)</span>
               <span className="kbd">Ctrl+P</span> <span>Quick open (tables, queries, connections)</span>
+              <span className="kbd">Ctrl+Shift+P</span> <span>Switch database</span>
               <span className="kbd">Ctrl+U</span> <span>Next connection (Ctrl+Shift+U: previous)</span>
               <span className="kbd">Alt+1…9</span> <span>Jump to connection N (Alt+0: manager)</span>
               <span className="kbd">F5</span> <span>Refresh table data</span>

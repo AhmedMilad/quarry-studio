@@ -13,7 +13,8 @@ export default function App(): JSX.Element {
   const activeSid = useApp((s) => s.activeSid)
   const theme = useApp((s) => s.settings.theme)
   const [settingsOpen, setSettingsOpen] = useState(false)
-  const [paletteOpen, setPaletteOpen] = useState(false)
+  // which palette is open: Ctrl+P (tables, connections…) or Ctrl+Shift+P (databases)
+  const [palette, setPalette] = useState<'default' | 'databases' | null>(null)
 
   useEffect(() => {
     init()
@@ -28,10 +29,11 @@ export default function App(): JSX.Element {
         e.stopPropagation()
       }
       const mod = e.ctrlKey || e.metaKey
-      // Ctrl+P: quick open
-      if (mod && !e.shiftKey && !e.altKey && e.code === 'KeyP') {
+      // Ctrl+P: quick open · Ctrl+Shift+P: switch database (same key again closes; the other switches)
+      if (mod && !e.altKey && e.code === 'KeyP') {
         handled()
-        setPaletteOpen((o) => !o)
+        const want = e.shiftKey ? 'databases' : 'default'
+        setPalette((p) => (p === want ? null : want))
         return
       }
       if (st.prompt || document.querySelector('.modal-backdrop')) return
@@ -85,7 +87,7 @@ export default function App(): JSX.Element {
       <Toasts />
       <PromptModal />
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
-      {paletteOpen && <Palette onClose={() => setPaletteOpen(false)} />}
+      {palette && <Palette key={palette} mode={palette} onClose={() => setPalette(null)} />}
     </div>
   )
 }

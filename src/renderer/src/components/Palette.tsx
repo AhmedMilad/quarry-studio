@@ -33,7 +33,10 @@ function score(text: string, q: string): number {
   return s - t.length
 }
 
-export function Palette({ onClose }: { onClose: () => void }): JSX.Element {
+let lastReturnFocus: HTMLElement | null = null
+
+/** `databases`: Ctrl+Shift+P, the connection's databases (pick one to switch to it) */
+export function Palette({ onClose, mode = 'default' }: { onClose: () => void; mode?: 'default' | 'databases' }): JSX.Element {
   const activeSid = useApp((s) => s.activeSid)
   const session = useApp((s) => (s.activeSid ? s.sessions[s.activeSid] : undefined))
   const sessions = useApp((s) => s.sessions)
@@ -43,8 +46,14 @@ export function Palette({ onClose }: { onClose: () => void }): JSX.Element {
   const [sel, setSel] = useState(0)
   const [saved, setSaved] = useState<SavedQuery[]>([])
   const listRef = useRef<HTMLDivElement>(null)
-  // where the keyboard was before the palette opened (a grid cell, the SQL editor…)
-  const returnFocus = useRef(document.activeElement as HTMLElement | null)
+  // where the keyboard was before the palette opened (a grid cell, the SQL editor…). Switching straight from
+  // one palette to the other (Ctrl+P → Ctrl+Shift+P) keeps the original target, not the old palette's input.
+  const returnFocus = useRef<HTMLElement | null>(null)
+  if (returnFocus.current === null) {
+    const a = document.activeElement as HTMLElement | null
+    returnFocus.current = a?.closest('.palette') ? lastReturnFocus : a
+    lastReturnFocus = returnFocus.current
+  }
   const chosen = useRef(false)
 
   useEffect(() => {
@@ -68,22 +77,29 @@ export function Palette({ onClose }: { onClose: () => void }): JSX.Element {
 
   // a server connection with no database chosen yet (e.g. MySQL connected without a default database):
   // list its databases first, then tables once one is picked
-  const pickDatabase = !!session && session.info.dialect !== 'sqlite' && !session.info.currentDatabase
+  const pickDatabase =
+    !!session && (mode === 'databases' || (session.info.dialect !== 'sqlite' && !session.info.currentDatabase))
 
   const items = useMemo<Item[]>(() => {
     const st = useApp.getState()
     const out: Item[] = []
     if (session && activeSid && pickDatabase) {
-      for (const d of session.databases) {
+      const current = session.info.currentDatabase
+      // the current database first, then the rest as listed
+      const dbs = current && !session.databases.includes(current) ? [current, ...session.databases] : session.databases
+      for (const d of [...dbs].sort((a, b) => Number(b === current) - Number(a === current))) {
         out.push({
           key: `d:${d}`,
           label: d,
-          detail: 'use database',
+          detail: d === current ? 'current database' : 'use database',
           group: 'Databases',
-          icon: <Database size={14} color="var(--accent)" />,
-          run: () => void st.useDatabase(activeSid, d)
+          icon: <Database size={14} color={d === current ? 'var(--success)' : 'var(--accent)'} />,
+          run: () => {
+            if (d !== current) void st.useDatabase(activeSid, d)
+          }
         })
       }
+      return out
     } else if (session && activeSid) {
       for (const t of session.tables) {
         out.push({
@@ -163,7 +179,11 @@ export function Palette({ onClose }: { onClose: () => void }): JSX.Element {
           <input
             autoFocus
             placeholder={
-              pickDatabase ? 'Select a database…' : session ? 'Search tables, views, saved queries, connections…' : 'Search connections…'
+              pickDatabase
+                ? `Switch database${session?.info.config.name ? ` on ${session.info.config.name}` : ''}…`
+                : session
+                  ? 'Search tables, views, saved queries, connections…'
+                  : 'Search connections…'
             }
             value={query}
             onChange={(e) => setQuery(e.target.value)}
