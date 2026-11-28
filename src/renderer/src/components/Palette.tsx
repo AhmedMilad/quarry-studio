@@ -43,10 +43,28 @@ export function Palette({ onClose }: { onClose: () => void }): JSX.Element {
   const [sel, setSel] = useState(0)
   const [saved, setSaved] = useState<SavedQuery[]>([])
   const listRef = useRef<HTMLDivElement>(null)
+  // where the keyboard was before the palette opened (a grid cell, the SQL editor…)
+  const returnFocus = useRef(document.activeElement as HTMLElement | null)
+  const chosen = useRef(false)
 
   useEffect(() => {
     api.listSaved().then(setSaved).catch(() => undefined)
   }, [])
+
+  // closed without choosing anything (Esc, click outside, Ctrl+P again): hand the keyboard back, otherwise
+  // focus is left on nothing once the palette's input is gone and e.g. the grid's arrow keys stop working
+  useEffect(
+    () => () => {
+      if (chosen.current) return
+      const el = returnFocus.current
+      setTimeout(() => {
+        const a = document.activeElement
+        if (a && a !== document.body) return
+        if (el?.isConnected && el.offsetParent !== null) el.focus({ preventScroll: true })
+      }, 0)
+    },
+    []
+  )
 
   // a server connection with no database chosen yet (e.g. MySQL connected without a default database):
   // list its databases first, then tables once one is picked
@@ -132,6 +150,7 @@ export function Palette({ onClose }: { onClose: () => void }): JSX.Element {
 
   const choose = (it: Item | undefined, alt: boolean, newTab = false): void => {
     if (!it) return
+    chosen.current = true
     onClose()
     it.run(alt, newTab)
   }
