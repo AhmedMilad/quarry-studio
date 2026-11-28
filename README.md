@@ -57,7 +57,7 @@
 - A Monaco editor (the editor from VS Code) with **context-aware autocomplete** for keywords, functions, snippets, tables, columns and aliases.
 - `Ctrl+Enter` runs the statement under the cursor, or the selection. `Ctrl+Shift+Enter` runs the whole script, with one result tab per statement.
 - You can cancel a running query (MySQL, PostgreSQL, SQL Server).
-- `Ctrl+Shift+F` formats the SQL. Queries can be saved (`Ctrl+S`), and history is kept automatically.
+- `Ctrl+Shift+I` (or `Ctrl+Shift+F`) formats the SQL. Queries can be saved (`Ctrl+S`), and history is kept automatically.
 
 ### Confirmation before UPDATE and DELETE
 
@@ -133,7 +133,7 @@ Building it yourself (see [Build from source](#build-from-source)) also gives yo
 | `Ctrl+P` | Quick open: connections when none is active, the server's databases when no database is selected yet, otherwise tables, views, saved queries and connections (`Shift+Enter` opens a table's structure, `Ctrl+Enter` opens it in a new tab) |
 | `Ctrl+Enter` / `Ctrl+Shift+Enter` | Run the current statement or selection / run all |
 | `Ctrl+S` | Save the query in a query tab; apply pending changes in a table tab |
-| `Ctrl+Shift+F` | Format SQL |
+| `Ctrl+Shift+I` / `Ctrl+Shift+F` | Format SQL |
 | `F5` / `Ctrl+R` | Refresh table data |
 | `Ctrl+Shift+R` | Refresh the sidebar's table list (also: the ↻ button on the Tables header, or right-click the list) |
 | `Ctrl+F` | Table tab: jump to the filter (query tab: find in the editor) |

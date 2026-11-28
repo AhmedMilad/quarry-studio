@@ -232,7 +232,10 @@ export function QueryTab({ sid, tab, active }: { sid: string; tab: QueryTabState
     ed.addAction({
       id: 'format-sql',
       label: 'Format SQL',
-      keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyF],
+      keybindings: [
+        monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyF,
+        monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.KeyI
+      ],
       contextMenuGroupId: 'navigation',
       contextMenuOrder: 3,
       run: () => handlers.current.formatQuery()
@@ -315,7 +318,7 @@ export function QueryTab({ sid, tab, active }: { sid: string; tab: QueryTabState
           </button>
         )}
         <span className="sep" />
-        <button className="btn ghost" onClick={formatQuery} title="Ctrl+Shift+F">
+        <button className="btn ghost" onClick={formatQuery} title="Format SQL (Ctrl+Shift+I or Ctrl+Shift+F)">
           <AlignLeft size={13} /> Format
         </button>
         <button className="btn ghost" onClick={save} title="Ctrl+S">

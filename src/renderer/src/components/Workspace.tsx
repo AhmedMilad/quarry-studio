@@ -74,6 +74,10 @@ export function Workspace({ sid, visible }: { sid: string; visible: boolean }): 
         case 'NumpadEnter':
           if (runTabCommand(tabId, e.shiftKey ? 'runAll' : 'run')) handled()
           break
+        case 'KeyI':
+          // Ctrl+Shift+I formats SQL too (VS Code's Linux binding); DevTools is on F12
+          if (e.shiftKey && runTabCommand(tabId, 'format')) handled()
+          break
         case 'KeyF':
           // Ctrl+Shift+F formats SQL; Ctrl+F focuses the table filter (query tabs keep Monaco's find)
           if (runTabCommand(tabId, e.shiftKey ? 'format' : 'find')) handled()
@@ -225,7 +229,7 @@ export function Workspace({ sid, visible }: { sid: string; visible: boolean }): 
               <span className="kbd">Ctrl+Enter</span> <span>Run statement</span>
               <span className="kbd">Ctrl+Shift+Enter</span> <span>Run all</span>
               <span className="kbd">Ctrl+S</span> <span>Save query</span>
-              <span className="kbd">Ctrl+Shift+F</span> <span>Format SQL</span>
+              <span className="kbd">Ctrl+Shift+I</span> <span>Format SQL (or Ctrl+Shift+F)</span>
               <span className="kbd">Ctrl+P</span> <span>Quick open (tables, queries, connections)</span>
               <span className="kbd">Ctrl+U</span> <span>Next connection (Ctrl+Shift+U: previous)</span>
               <span className="kbd">Alt+1…9</span> <span>Jump to connection N (Alt+0: manager)</span>
