@@ -8,7 +8,8 @@ type FkLink = NonNullable<GridColumn['fk']>
 
 /**
  * Foreign-key columns of a table tab, as links: column name → { target, open(row) }.
- * Opening a link shows the referenced row in a new tab, filtered on the key (all columns of a composite key).
+ * Opening a link shows the referenced row, filtered on the key (all columns of a composite key), in an open tab of
+ * that table if there is one, otherwise in a new tab.
  */
 export function useForeignKeyLinks(sid: string, tab: TableTabState, columns: ResultColumn[]): Map<string, FkLink> {
   const [fks, setFks] = useState<ForeignKeyInfo[]>([])
@@ -41,7 +42,7 @@ export function useForeignKeyLinks(sid: string, tab: TableTabState, columns: Res
       const info =
         sessionTables?.find((t) => t.name === refTable.name && (!refTable.schema || !t.schema || t.schema === refTable.schema)) ??
         { ...refTable, type: 'table' as const }
-      openTableTab(sid, info, 'data', true, filters)
+      openTableTab(sid, info, 'data', false, filters) // reuses an open tab of that table
     },
     [sid, tab.table.schema, columns, sessionTables, openTableTab]
   )

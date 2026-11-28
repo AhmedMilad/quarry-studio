@@ -30,6 +30,8 @@ export interface TableTabState {
   view: 'data' | 'structure'
   /** filters already applied when the tab opens (e.g. following a foreign key) */
   initialFilters?: FilterCondition[]
+  /** filters to apply to this already-open tab (a foreign key followed into it); `seq` makes each request new */
+  filterRequest?: { filters: FilterCondition[]; seq: number }
 }
 
 export type Tab = QueryTabState | TableTabState
@@ -105,7 +107,10 @@ interface AppState {
   setSchema(sid: string, schema: string): Promise<void>
   openQueryTab(sid: string, sql?: string, title?: string, savedId?: string): void
   /** focuses an existing tab of this table unless `newTab` is set (always opens another one) */
-  /** `filters` opens a new tab with those filters applied (used to follow a foreign key) */
+  /**
+   * `filters` shows the table with those filters applied (used to follow a foreign key): in an open tab of
+   * that table if there is one, otherwise in a new tab
+   */
   openTableTab(sid: string, t: TableInfo, view?: 'data' | 'structure', newTab?: boolean, filters?: FilterCondition[]): void
   closeTab(sid: string, tabId: string): void
   closeOtherTabs(sid: string, tabId: string): void
@@ -278,7 +283,6 @@ export const useApp = create<AppState>((set, get) => {
     },
 
     openTableTab(sid, t, view = 'data', newTab = false, filters) {
-      if (filters?.length) newTab = true
       const s = get().sessions[sid]
       if (!s) return
       const sameTable = s.tabs.filter(
@@ -287,9 +291,11 @@ export const useApp = create<AppState>((set, get) => {
       const activeSame = sameTable.find((x) => x.id === s.activeTabId)
       const existing = newTab ? undefined : (activeSame ?? sameTable[sameTable.length - 1])
       if (existing) {
+        const patch: Partial<TableTabState> = { view }
+        if (filters?.length) patch.filterRequest = { filters, seq: Date.now() + Math.random() }
         patchSession(sid, {
           activeTabId: existing.id,
-          tabs: s.tabs.map((x) => (x.id === existing.id ? { ...existing, view } : x))
+          tabs: s.tabs.map((x) => (x.id === existing.id ? { ...existing, ...patch } : x))
         })
         return
       }

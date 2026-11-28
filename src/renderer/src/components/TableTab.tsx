@@ -188,6 +188,28 @@ function TableData({ sid, tab }: { sid: string; tab: TableTabState }): JSX.Eleme
   const confirmDiscard = async (): Promise<boolean> =>
     pending.total === 0 || api.confirm('Discard pending changes?', `${pending.total} unsaved change(s) will be lost.`, 'Discard')
 
+  // a foreign key was followed into this already-open tab: show just the referenced row(s)
+  const seenFilterRequest = useRef(tab.filterRequest?.seq)
+  useEffect(() => {
+    const req = tab.filterRequest
+    if (!req || req.seq === seenFilterRequest.current) return
+    seenFilterRequest.current = req.seq
+    void (async () => {
+      if (!(await confirmDiscard())) return
+      setFilterMode('builder')
+      setFilters(req.filters)
+      setJoin('AND')
+      setRawWhere('')
+      setPage(0)
+      setApplied({ filters: req.filters, where: '', join: 'AND' })
+      setTimeout(() => {
+        // start on the first (usually the only) matching row
+        filterBarRef.current?.closest('.tab-content')?.querySelector('.dt-wrap')?.dispatchEvent(new Event('quarry-focus-first'))
+      }, 0)
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab.filterRequest?.seq])
+
   const guarded = (fn: () => void) => async () => {
     if (await confirmDiscard()) fn()
   }

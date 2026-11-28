@@ -184,6 +184,24 @@ export function DataTable(props: Props): JSX.Element {
     return () => el.removeEventListener('quarry-focus-grid', focusGrid)
   }, [lead])
 
+  // 'quarry-focus-first': the next rows that arrive (e.g. after a foreign key was followed into this tab)
+  // start with the cursor on the first data cell
+  const focusFirstPending = useRef(false)
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const req = (): void => {
+      focusFirstPending.current = true
+    }
+    el.addEventListener('quarry-focus-first', req)
+    return () => el.removeEventListener('quarry-focus-first', req)
+  }, [])
+  useLayoutEffect(() => {
+    if (!focusFirstPending.current || !rows.length) return
+    focusFirstPending.current = false
+    gridRef.current?.selectCell({ rowIdx: 0, idx: lead })
+  }, [rows, lead])
+
   const rangeCells = useCallback((): { r: number; c: number }[] => {
     if (!b) return []
     const out: { r: number; c: number }[] = []
