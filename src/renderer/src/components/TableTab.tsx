@@ -155,6 +155,7 @@ function TableData({ sid, tab }: { sid: string; tab: TableTabState }): JSX.Eleme
       ...c,
       type: byName.get(c.name)?.dataType ?? c.type,
       pk: byName.get(c.name)?.primaryKey,
+      nullable: byName.get(c.name)?.nullable,
       fk: fkLinks.get(c.name)
     }))
   }, [data.columns, meta, fkLinks])
@@ -636,9 +637,10 @@ function TableData({ sid, tab }: { sid: string; tab: TableTabState }): JSX.Eleme
                       ...(key.startsWith('c')
                         ? [
                             {
-                              label: 'Set NULL',
+                              label: columns[Number(key.slice(1))]?.nullable === false ? 'Set NULL (column is NOT NULL)' : 'Set NULL',
                               icon: <X size={14} />,
-                              disabled: row.__state === 'deleted',
+                              shortcut: 'Shift+Del',
+                              disabled: row.__state === 'deleted' || columns[Number(key.slice(1))]?.nullable === false,
                               onClick: () => setRows(data.rows.map((r) => (r.__id === row.__id ? { ...r, [key]: null } : r)))
                             }
                           ]

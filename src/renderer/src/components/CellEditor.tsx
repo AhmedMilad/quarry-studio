@@ -15,7 +15,13 @@ function textWidth(text: string, font: string): number {
  * selection is non-empty we draw our own at the selection's focus end; once it collapses the native
  * caret takes over.
  */
-export function CellEditor<R, SR>({ row, column, onRowChange, onClose }: RenderEditCellProps<R, SR>) {
+export function CellEditor<R, SR>({
+  row,
+  column,
+  onRowChange,
+  onClose,
+  nullable = true
+}: RenderEditCellProps<R, SR> & { nullable?: boolean }) {
   const ref = useRef<HTMLInputElement>(null)
   const [caretX, setCaretX] = useState<number | null>(null)
   const [blinkKey, setBlinkKey] = useState(0)
@@ -48,17 +54,40 @@ export function CellEditor<R, SR>({ row, column, onRowChange, onClose }: RenderE
     return () => document.removeEventListener('selectionchange', update)
   }, [update])
 
+  // commit NULL and close the editor (an empty box would save an empty string, which is not NULL)
+  const setNull = (): void => onRowChange({ ...row, [column.key]: null }, true)
+
   return (
     <div className="cell-editor">
       <input
         ref={ref}
-        className="rdg-text-editor"
+        className={`rdg-text-editor${value == null ? ' is-null' : ''}${nullable ? ' has-null-btn' : ''}`}
         value={value == null ? '' : String(value)}
+        placeholder={value == null ? 'NULL' : ''}
         onChange={(e) => onRowChange({ ...row, [column.key]: e.target.value })}
+        onKeyDown={(e) => {
+          if (nullable && (e.ctrlKey || e.metaKey) && e.shiftKey && e.code === 'KeyN') {
+            e.preventDefault()
+            e.stopPropagation()
+            setNull()
+          }
+        }}
         onScroll={update}
         onBlur={() => onClose(true, false)}
       />
       {caretX != null && <span key={blinkKey} className="cell-editor-caret" style={{ left: caretX }} />}
+      {nullable && (
+        <button
+          type="button"
+          className="cell-editor-null"
+          title="Set to NULL (Ctrl+Shift+N)"
+          tabIndex={-1}
+          onMouseDown={(e) => e.preventDefault()} // keep focus in the input so the editor doesn't close first
+          onClick={setNull}
+        >
+          NULL
+        </button>
+      )}
     </div>
   )
 }

@@ -75,7 +75,7 @@ Delete confirmations are red and update confirmations are light blue. **Cancel**
 
 - Paged rows with server-side sorting. When a table opens, its first cell is selected, so you can move around with the arrow keys straight away.
 - **Filters:** use the builder, which matches **ALL (AND)** or **ANY (OR)** of its lines, or type a raw `WHERE` clause. Lines with an empty value are ignored. For `IS NULL` / `IS NOT NULL` the value field is disabled.
-- **Inline editing** of cells, plus adding, cloning and deleting rows and setting values to NULL. Changes are highlighted and stay pending until you **apply them in one transaction** (`Ctrl+S`), or discard them (`Esc`).
+- **Inline editing** of cells, plus adding, cloning and deleting rows and setting values to NULL (the NULL button in the cell editor, `Ctrl+Shift+N`, or `Shift+Delete` on selected cells; an empty box saves an empty string, not NULL). Changes are highlighted and stay pending until you **apply them in one transaction** (`Ctrl+S`), or discard them (`Esc`).
 - **Range selection:** drag, `Shift+click` or `Shift+arrows` to select cells. Copy them as TSV, paste a block (a single value fills the whole range), or set them all to NULL. A badge shows the count, sum, average, minimum and maximum.
 - **Foreign keys are links:** values in a foreign-key column (marked with a link icon in the header) are clickable. Clicking one opens the referenced table in a new tab, filtered to that row. Composite keys match on all their columns. Select a foreign-key cell and press `Ctrl+Enter` to do the same from the keyboard. To edit a foreign-key cell, double-click beside the value or press `Enter`.
 - **Copy as INSERT:** right-click a row to copy it as an `INSERT` statement. With rows ticked or a multi-row cell range selected, it copies all of them ("Copy 3 rows as INSERT"). Query results get it too: a plain single-table `SELECT` uses that table's name, and anything else uses a `table_name` placeholder.
@@ -141,6 +141,8 @@ Building it yourself (see [Build from source](#build-from-source)) also gives yo
 | `Ctrl+C` / `Ctrl+V` | Copy the selected rows or cell range as TSV / paste into a cell range |
 | Drag / `Shift+Click` / `Shift+Arrows` | Select a range of cells |
 | Double-click a cell | Edit it (the whole value is selected) |
+| `Ctrl+Shift+N` (while editing) / **NULL** button | Set the cell to NULL (not available for NOT NULL columns) |
+| `Shift+Delete` | Set the selected cell, or every cell in a selected range, to NULL. NOT NULL columns are skipped |
 | `Delete` | Mark the ticked rows for deletion (applied with `Ctrl+S`, undone with `Esc`) |
 | `Ctrl+D` / `Ctrl+Shift+D` | Add a new row / remove unsaved new rows one per press, bottom-up |
 | `Ctrl+L` / `Ctrl+Shift+L` | Add a filter line / remove the focused (or last) line |

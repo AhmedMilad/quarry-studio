@@ -17,6 +17,8 @@ export interface GridRow {
 
 export interface GridColumn extends ResultColumn {
   pk?: boolean
+  /** false for NOT NULL columns (undefined = unknown, treated as nullable) */
+  nullable?: boolean
   /** foreign key: the value is rendered as a link that opens the referenced row */
   fk?: { target: string; open: (row: GridRow) => void }
 }
@@ -208,11 +210,20 @@ export function DataTable(props: Props): JSX.Element {
   /** set every cell of the range to one value (editable grids only) */
   const fillRange = (value: CellValue): void => {
     if (!b || !props.onRowsChange) return
+    // NULL never goes into a NOT NULL column
+    const cols: number[] = []
+    for (let c = b.c1; c <= b.c2; c++) if (value !== null || columns[c]?.nullable !== false) cols.push(c)
+    const skipped = b.c2 - b.c1 + 1 - cols.length
+    if (skipped) {
+      const names = columns.slice(b.c1, b.c2 + 1).filter((c) => c.nullable === false).map((c) => c.name)
+      toast(`${names.join(', ')} ${names.length === 1 ? "doesn't" : "don't"} allow NULL`, cols.length ? 'info' : 'error')
+    }
+    if (!cols.length) return
     const next = rows.slice()
     for (let r = b.r1; r <= b.r2; r++) {
       if (next[r].__state === 'deleted') continue
       const row = { ...next[r] }
-      for (let c = b.c1; c <= b.c2; c++) row[colKey(c)] = value
+      for (const c of cols) row[colKey(c)] = value
       next[r] = row
     }
     props.onRowsChange(next)
@@ -268,6 +279,11 @@ export function DataTable(props: Props): JSX.Element {
       e.preventDefault()
       e.stopPropagation()
       pasteClipboard().catch((err) => toast((err as Error).message, 'error'))
+    } else if (e.code === 'Delete' && e.shiftKey && !mod && !e.altKey && editable && props.onRowsChange && b) {
+      // Shift+Delete: set the selected cell / range to NULL (plain Delete marks rows for deletion)
+      e.preventDefault()
+      e.stopPropagation()
+      fillRange(null)
     }
   }
 
@@ -317,7 +333,7 @@ export function DataTable(props: Props): JSX.Element {
         resizable: true,
         sortable: !!props.onSortColumnsChange,
         editable: editable ? (row) => row.__state !== 'deleted' : false,
-        renderEditCell: editable ? CellEditor : undefined,
+        renderEditCell: editable ? (p) => <CellEditor {...p} nullable={c.nullable !== false} /> : undefined,
         cellClass: (row) => {
           const edited = props.isEdited?.(row, key) ? 'cell-edited' : ''
           if (!b || !multi || i < b.c1 || i > b.c2) return edited || undefined
