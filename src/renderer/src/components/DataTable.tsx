@@ -197,9 +197,12 @@ export function DataTable(props: Props): JSX.Element {
     return () => el.removeEventListener('quarry-focus-first', req)
   }, [])
   useLayoutEffect(() => {
-    if (!focusFirstPending.current || !rows.length) return
-    focusFirstPending.current = false
+    if (!focusFirstPending.current) return
+    focusFirstPending.current = false // also when nothing matched, so a later reload doesn't grab focus
+    if (!rows.length) return
     gridRef.current?.selectCell({ rowIdx: 0, idx: lead })
+    // if that cell was already selected the grid only scrolls to it, so take focus explicitly
+    setTimeout(() => gridRef.current?.element?.querySelector<HTMLElement>('[role=gridcell][aria-selected=true]')?.focus({ preventScroll: true }), 0)
   }, [rows, lead])
 
   const rangeCells = useCallback((): { r: number; c: number }[] => {

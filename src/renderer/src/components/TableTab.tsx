@@ -188,6 +188,13 @@ function TableData({ sid, tab }: { sid: string; tab: TableTabState }): JSX.Eleme
   const confirmDiscard = async (): Promise<boolean> =>
     pending.total === 0 || api.confirm('Discard pending changes?', `${pending.total} unsaved change(s) will be lost.`, 'Discard')
 
+  /** when the next rows arrive, put the cursor (and keyboard focus) on the first data cell */
+  const focusFirstRowAfterLoad = (): void => {
+    setTimeout(() => {
+      filterBarRef.current?.closest('.tab-content')?.querySelector('.dt-wrap')?.dispatchEvent(new Event('quarry-focus-first'))
+    }, 0)
+  }
+
   // a foreign key was followed into this already-open tab: show just the referenced row(s)
   const seenFilterRequest = useRef(tab.filterRequest?.seq)
   useEffect(() => {
@@ -202,10 +209,7 @@ function TableData({ sid, tab }: { sid: string; tab: TableTabState }): JSX.Eleme
       setRawWhere('')
       setPage(0)
       setApplied({ filters: req.filters, where: '', join: 'AND' })
-      setTimeout(() => {
-        // start on the first (usually the only) matching row
-        filterBarRef.current?.closest('.tab-content')?.querySelector('.dt-wrap')?.dispatchEvent(new Event('quarry-focus-first'))
-      }, 0)
+      focusFirstRowAfterLoad() // start on the first (usually the only) matching row
     })()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab.filterRequest?.seq])
@@ -555,6 +559,7 @@ function TableData({ sid, tab }: { sid: string; tab: TableTabState }): JSX.Eleme
       where: filterMode === 'raw' ? rawWhere : '',
       join: joinOverride ?? join
     })
+    focusFirstRowAfterLoad() // so the keyboard works on the results straight away
   }
 
   // switching AND/OR re-runs the filter right away when builder filters are active
