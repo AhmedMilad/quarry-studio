@@ -1838,3 +1838,15 @@ pre.ddl {
   color: var(--accent);
   border-color: var(--accent);
 }
+
+/* refresh button on the sidebar's Tables / Views / Routines headers */
+.tree-section .tree-section-refresh {
+  width: 20px;
+  height: 20px;
+  margin-left: 4px;
+  opacity: 0.55;
+}
+.tree-section:hover .tree-section-refresh,
+.tree-section .tree-section-refresh:focus-visible {
+  opacity: 1;
+}

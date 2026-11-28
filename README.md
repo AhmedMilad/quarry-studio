@@ -135,6 +135,7 @@ Building it yourself (see [Build from source](#build-from-source)) also gives yo
 | `Ctrl+S` | Save the query in a query tab; apply pending changes in a table tab |
 | `Ctrl+Shift+F` | Format SQL |
 | `F5` / `Ctrl+R` | Refresh table data |
+| `Ctrl+Shift+R` | Refresh the sidebar's table list (also: the ↻ button on the Tables header, or right-click the list) |
 | `Ctrl+F` | Table tab: jump to the filter (query tab: find in the editor) |
 | `Esc` | Table tab, one step per press: leave the filter → discard unapplied edits → clear an active filter → deselect rows |
 | `Ctrl+A` | Table tab: select all rows on the page (press again to clear) |

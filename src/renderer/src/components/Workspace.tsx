@@ -94,7 +94,11 @@ export function Workspace({ sid, visible }: { sid: string; visible: boolean }): 
           if (!e.shiftKey && !isTypingTarget(document.activeElement) && runTabCommand(tabId, 'copySelection')) handled()
           break
         case 'KeyR':
-          if (!e.shiftKey && runTabCommand(tabId, 'refresh')) handled()
+          // Ctrl+R refreshes the table's data; Ctrl+Shift+R the sidebar's table list
+          if (e.shiftKey) {
+            void app.refreshTables(sid)
+            handled()
+          } else if (runTabCommand(tabId, 'refresh')) handled()
           break
         case 'KeyT':
           handled()
@@ -226,6 +230,7 @@ export function Workspace({ sid, visible }: { sid: string; visible: boolean }): 
               <span className="kbd">Ctrl+U</span> <span>Next connection (Ctrl+Shift+U: previous)</span>
               <span className="kbd">Alt+1…9</span> <span>Jump to connection N (Alt+0: manager)</span>
               <span className="kbd">F5</span> <span>Refresh table data</span>
+              <span className="kbd">Ctrl+Shift+R</span> <span>Refresh the table list</span>
               <span className="kbd">Ctrl+F</span> <span>Filter table data</span>
               <span className="kbd">Esc</span> <span>Clear filter / discard unapplied changes</span>
               <span className="kbd">Delete</span> <span>Mark ticked rows for deletion (Ctrl+S applies)</span>

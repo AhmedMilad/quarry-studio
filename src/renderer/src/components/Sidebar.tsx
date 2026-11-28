@@ -60,7 +60,7 @@ export function Sidebar({ sid }: { sid: string }): JSX.Element {
 function SidebarHeader({ sid, s }: { sid: string; s: SessionState }): JSX.Element {
   const useDatabase = useApp((st) => st.useDatabase)
   const setSchema = useApp((st) => st.setSchema)
-  const refresh = useApp((st) => st.refreshSession)
+  const refresh = useApp((st) => st.refreshTables)
   const disconnect = useApp((st) => st.disconnect)
   const { info } = s
   const isSqlite = info.dialect === 'sqlite'
@@ -73,7 +73,7 @@ function SidebarHeader({ sid, s }: { sid: string; s: SessionState }): JSX.Elemen
         <span className="name" title={info.serverVersion}>
           {info.config.name}
         </span>
-        <button className="icon-btn" title="Refresh" onClick={() => refresh(sid)}>
+        <button className="icon-btn" title="Refresh the table list (Ctrl+Shift+R)" onClick={() => refresh(sid)}>
           <RefreshCw size={14} className={s.loading ? 'spin' : ''} />
         </button>
         <button className="icon-btn" title="Disconnect" onClick={() => disconnect(sid)}>
@@ -121,12 +121,33 @@ function EntityTree({ sid, s }: { sid: string; s: SessionState }): JSX.Element {
   const views = useMemo(() => s.tables.filter((t) => t.type === 'view' && t.name.toLowerCase().includes(f)), [s.tables, f])
   const routines = useMemo(() => s.routines.filter((r) => r.name.toLowerCase().includes(f)), [s.routines, f])
   const toggle = (k: string): void => setCollapsed((c) => ({ ...c, [k]: !c[k] }))
+  const refreshTables = useApp((st) => st.refreshTables)
+  const showMenu = useApp((st) => st.showMenu)
+  const refreshList = (): void => void refreshTables(sid)
+  // right-click anywhere in the list except on a table (tables have their own menu)
+  const listMenu = (e: React.MouseEvent): void => {
+    if ((e.target as Element).closest('.tree-item')) return
+    e.preventDefault()
+    showMenu(e.clientX, e.clientY, [
+      { label: 'Refresh list', icon: <RefreshCw size={14} />, shortcut: 'Ctrl+Shift+R', onClick: refreshList }
+    ])
+  }
 
   const section = (key: string, title: string, count: number): JSX.Element => (
     <div className="tree-section" onClick={() => toggle(key)}>
       <ChevronRight size={12} className={`chev${collapsed[key] ? '' : ' open'}`} style={{ transition: 'transform .12s', transform: collapsed[key] ? '' : 'rotate(90deg)' }} />
       {title}
       <span style={{ marginLeft: 'auto', fontWeight: 500 }}>{count}</span>
+      <button
+        className="icon-btn tree-section-refresh"
+        title="Refresh the list (Ctrl+Shift+R)"
+        onClick={(e) => {
+          e.stopPropagation() // don't collapse the section
+          refreshList()
+        }}
+      >
+        <RefreshCw size={11} className={s.loading ? 'spin' : ''} />
+      </button>
     </div>
   )
 
@@ -147,7 +168,7 @@ function EntityTree({ sid, s }: { sid: string; s: SessionState }): JSX.Element {
           </button>
         )}
       </div>
-      <div className="sidebar-body">
+      <div className="sidebar-body" onContextMenu={listMenu}>
         {!s.info.currentDatabase && s.info.dialect === 'mysql' && (
           <div className="empty-note">Select a database above to browse its tables.</div>
         )}

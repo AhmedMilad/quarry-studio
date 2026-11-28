@@ -103,6 +103,8 @@ interface AppState {
   disconnect(sid: string): Promise<void>
   setActive(sid: string | null): void
   refreshSession(sid: string): Promise<void>
+  /** reload the table / view / routine list and say what changed (the explicit "refresh list" action) */
+  refreshTables(sid: string): Promise<void>
   useDatabase(sid: string, db: string): Promise<void>
   setSchema(sid: string, schema: string): Promise<void>
   openQueryTab(sid: string, sql?: string, title?: string, savedId?: string): void
@@ -251,6 +253,21 @@ export const useApp = create<AppState>((set, get) => {
 
     refreshSession(sid) {
       return loadMeta(sid)
+    },
+
+    async refreshTables(sid) {
+      const before = get().sessions[sid]?.tables
+      if (!before) return
+      await loadMeta(sid)
+      const after = get().sessions[sid]?.tables ?? []
+      const key = (t: TableInfo): string => `${t.schema ?? ''}.${t.name}`
+      const had = new Set(before.map(key))
+      const has = new Set(after.map(key))
+      const added = after.filter((t) => !had.has(key(t))).map((t) => t.name)
+      const removed = before.filter((t) => !has.has(key(t))).map((t) => t.name)
+      const list = (names: string[]): string => (names.length > 3 ? `${names.slice(0, 3).join(', ')} +${names.length - 3}` : names.join(', '))
+      const parts = [added.length ? `added ${list(added)}` : '', removed.length ? `removed ${list(removed)}` : ''].filter(Boolean)
+      get().toast(parts.length ? `Table list refreshed: ${parts.join('; ')}` : `Table list refreshed (${after.length} tables and views, no changes)`, 'success')
     },
 
     async useDatabase(sid, db) {
