@@ -160,3 +160,19 @@ function mainKeywordAfterWith(sql: string): string | null {
   }
   return null
 }
+
+/**
+ * The database named by the last `USE <db>` statement in a script (MySQL / SQL Server), or null.
+ * Accepts `name`, [name] and "name"; comments before the statement are ignored.
+ */
+export function useDatabaseTarget(sql: string, dialect: string): string | null {
+  if (dialect !== 'mysql' && dialect !== 'mssql') return null
+  let target: string | null = null
+  const parts = dialect === 'mssql' ? splitGoBatches(sql).flatMap((b) => splitStatements(b)) : splitStatements(sql)
+  for (const s of parts) {
+    const body = s.text.replace(/^(\s*(--[^\n]*\n|\/\*[\s\S]*?\*\/))*/g, '').trim().replace(/;\s*$/, '')
+    const m = /^USE\s+(`[^`]+`|\[[^\]]+\]|"[^"]+"|[\w$]+)\s*$/i.exec(body)
+    if (m) target = m[1].replace(/^[`["]|[`"\]]$/g, '')
+  }
+  return target
+}

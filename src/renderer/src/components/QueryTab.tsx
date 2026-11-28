@@ -15,7 +15,7 @@ import {
   FileSpreadsheet
 } from 'lucide-react'
 import type { DestructiveCheck, Dialect, ExportFormat, QueryResult, TextExportFormat } from '@shared/types'
-import { splitStatements, statementAt } from '@shared/sql'
+import { splitStatements, statementAt, useDatabaseTarget } from '@shared/sql'
 import { analyzeDestructive } from '@shared/destructive'
 import { DestructiveConfirm } from './DestructiveConfirm'
 import { formatRows, selectSourceTable } from '@shared/export'
@@ -148,7 +148,14 @@ export function QueryTab({ sid, tab, active }: { sid: string; tab: QueryTabState
           }
         }
         setState((s) => ({ ...s, running: false, results, active: Math.max(0, activeIdx), error: undefined }))
-        if (results.some((r) => r.command && !r.columns.length)) useApp.getState().refreshSession(sid)
+        // `USE other_db` only switched the one connection that ran it: switch the whole session instead, so the
+        // database selector, the table list and every later query follow (and the pool starts clean)
+        const app = useApp.getState()
+        const useDb = useDatabaseTarget(sql, dialect)
+        if (useDb && useDb !== app.sessions[sid]?.info.currentDatabase) {
+          await app.useDatabase(sid, useDb)
+          if (useApp.getState().sessions[sid]?.info.currentDatabase === useDb) toast(`Switched to database ${useDb}`, 'success')
+        } else if (results.some((r) => r.command && !r.columns.length)) app.refreshSession(sid)
       } catch (e) {
         setState((s) => ({ ...s, running: false, results: [], error: (e as Error).message }))
       } finally {

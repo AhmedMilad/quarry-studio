@@ -57,6 +57,7 @@
 - A Monaco editor (the editor from VS Code) with **context-aware autocomplete** for keywords, functions, snippets, tables, columns and aliases.
 - `Ctrl+Enter` runs the statement under the cursor, or the selection. `Ctrl+Shift+Enter` runs the whole script, with one result tab per statement.
 - You can cancel a running query (MySQL, PostgreSQL, SQL Server).
+- Running `USE other_db` (MySQL, SQL Server) switches the whole connection to that database: the database selector, the table list and later queries all follow.
 - `Ctrl+Shift+I` (or `Ctrl+Shift+F`) formats the SQL. Queries can be saved (`Ctrl+S`), and history is kept automatically.
 
 ### Confirmation before UPDATE and DELETE

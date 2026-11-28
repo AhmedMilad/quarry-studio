@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isReadOnlyStatement, splitGoBatches, splitStatements, statementAt } from '@shared/sql'
+import { isReadOnlyStatement, splitGoBatches, splitStatements, statementAt, useDatabaseTarget } from '@shared/sql'
 
 const texts = (sql: string): string[] => splitStatements(sql).map((s) => s.text.trim())
 
@@ -77,4 +77,26 @@ describe('isReadOnlyStatement', () => {
     'WITH x AS (SELECT 1) INSERT INTO t SELECT * FROM x',
     'with recursive r(n) as (select 1) delete from t'
   ])('blocks %s', (sql) => expect(isReadOnlyStatement(sql)).toBe(false))
+})
+
+describe('useDatabaseTarget', () => {
+  it.each([
+    ['USE shop', 'shop'],
+    ['use `my-db`;', 'my-db'],
+    ['USE [Sales DB]', 'Sales DB'],
+    ['USE "warehouse"', 'warehouse'],
+    ['-- switch\nUSE shop; SELECT 1', 'shop'],
+    ['USE a; SELECT 1; USE b', 'b']
+  ])('mysql: %s → %s', (sql, db) => expect(useDatabaseTarget(sql, 'mysql')).toBe(db))
+
+  it('reads T-SQL batches', () => expect(useDatabaseTarget('USE master\nGO\nUSE [app]\nGO', 'mssql')).toBe('app'))
+
+  it.each(['SELECT 1', "SELECT 'USE shop'", 'USE', 'USE a b', 'used = 1'])('no switch for %s', (sql) =>
+    expect(useDatabaseTarget(sql, 'mysql')).toBeNull()
+  )
+
+  it('PostgreSQL and SQLite have no USE', () => {
+    expect(useDatabaseTarget('USE shop', 'postgres')).toBeNull()
+    expect(useDatabaseTarget('USE shop', 'sqlite')).toBeNull()
+  })
 })
